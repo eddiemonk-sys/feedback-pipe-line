@@ -35,6 +35,10 @@ export class NotionFeedbackWriter implements NotionWriter {
             ? [{ text: { content: r.customerAccount.slice(0, MAX_TEXT) } }]
             : [],
         },
+        ...(r.summary
+          ? { Summary: { rich_text: [{ text: { content: r.summary.slice(0, MAX_TEXT) } }] } }
+          : {}),
+        ...(r.category ? { Category: { select: { name: r.category } } } : {}),
       },
     });
     return page.id;
