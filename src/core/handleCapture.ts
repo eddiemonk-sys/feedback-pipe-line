@@ -94,7 +94,10 @@ export async function handleCapture(
 
     const dateIso = new Date(Number(req.messageTs) * 1000).toISOString().slice(0, 10);
 
-    const enrichment = await deps.enricher.enrich(text, channelName).catch(() => null);
+    const enrichment = await deps.enricher.enrich(text, channelName).catch((err) => {
+      logger.warn("Enrichment failed — capturing without summary/category", { err: String(err) });
+      return null;
+    });
 
     const pageId = await notion.createFeedback({
       message: text,
