@@ -1,0 +1,25 @@
+{
+  "name": "feedback-pipeline",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Slice 2 — Slack :mega: reaction -> Notion 'Customer Feedback' capture bot (Socket Mode).",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/core/handleCapture.test.ts",
+    "setup:test-db": "tsx scripts/createTestDb.ts"
+  },
+  "dependencies": {
+    "@notionhq/client": "^2.2.15",
+    "@slack/bolt": "^3.21.4",
+    "@slack/web-api": "^6.12.1",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
