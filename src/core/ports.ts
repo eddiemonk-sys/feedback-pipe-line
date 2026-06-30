@@ -36,6 +36,8 @@ export interface FeedbackRecord {
   source: string;
   messageUrl: string;
   customerAccount: string;
+  summary?: string;        // AI-generated; absent when enrichment is disabled or failed
+  category?: FeedbackCategory; // AI-assigned; absent when enrichment is disabled or failed
 }
 
 export interface NotionWriter {
@@ -53,4 +55,23 @@ export interface DedupStore {
   /** Return the stored page ID, or null for keys recorded before this field existed. */
   getPageId(key: string): string | null;
   close(): void;
+}
+
+export type FeedbackCategory =
+  | "Bug / Broken"
+  | "Feature Request"
+  | "Pricing / Commercial"
+  | "Onboarding / Setup"
+  | "UX / Usability"
+  | "Reporting / Data"
+  | "Praise"
+  | "Other";
+
+export interface EnrichmentResult {
+  summary: string;
+  category: FeedbackCategory;
+}
+
+export interface Enricher {
+  enrich(text: string, channelName: string): Promise<EnrichmentResult | null>;
 }
