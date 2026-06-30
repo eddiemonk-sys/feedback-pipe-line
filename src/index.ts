@@ -5,6 +5,7 @@ import { NotionFeedbackWriter } from "./adapters/notion/notionWriter.js";
 import { LocalFeedbackWriter } from "./adapters/notion/localWriter.js";
 import { FileDedupStore } from "./adapters/dedup/fileStore.js";
 import { startSocketMode } from "./adapters/transport/socketMode.js";
+import { NullEnricher } from "./adapters/enricher/nullEnricher.js";
 import { handleCapture, type CaptureDeps, type CaptureResult } from "./core/handleCapture.js";
 import type { CaptureRequest } from "./core/events.js";
 import type { SlackGateway, NotionWriter } from "./core/ports.js";
@@ -68,6 +69,7 @@ async function main(): Promise<void> {
     logger,
     source: "Slack",
     botUserId,
+    enricher: new NullEnricher(),
   };
 
   // ...and wire them into the single handler the transport invokes. handleCapture is

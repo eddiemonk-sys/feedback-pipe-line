@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { handleCapture, dedupKey, type CaptureDeps } from "./handleCapture.js";
 import type { CaptureRequest } from "./events.js";
-import type { FeedbackRecord } from "./ports.js";
+import type { FeedbackRecord, FeedbackCategory } from "./ports.js";
 
 const req: CaptureRequest = {
   triggerType: "mega_reaction",
@@ -43,6 +43,12 @@ function makeDeps() {
       getPermalink: async () => "https://spottedzebra.slack.com/archives/C123/p1719600000000100",
       addReaction: async () => {},
       postReply: async () => {},
+    },
+    enricher: {
+      enrich: async () => ({
+        summary: "Customer wants SSO integration.",
+        category: "Feature Request" as FeedbackCategory,
+      }),
     },
   };
   return { deps, writes, appendedFlaggers, store };
@@ -116,4 +122,20 @@ test("returns no_message when the message can't be fetched", async () => {
   const res = await handleCapture(req, deps);
   assert.equal(res.status, "no_message");
   assert.equal(writes.length, 0);
+});
+
+test("includes enriched summary and category in the feedback record", async () => {
+  const { deps, writes } = makeDeps();
+  await handleCapture(req, deps);
+  assert.equal(writes[0].summary, "Customer wants SSO integration.");
+  assert.equal(writes[0].category, "Feature Request");
+});
+
+test("writes feedback without enrichment when enricher returns null", async () => {
+  const { deps, writes } = makeDeps();
+  deps.enricher.enrich = async () => null;
+  const res = await handleCapture(req, deps);
+  assert.equal(res.status, "captured");
+  assert.equal(writes[0].summary, undefined);
+  assert.equal(writes[0].category, undefined);
 });

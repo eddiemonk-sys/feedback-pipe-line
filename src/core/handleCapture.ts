@@ -1,5 +1,5 @@
 import type { CaptureRequest } from "./events.js";
-import type { SlackGateway, NotionWriter, DedupStore } from "./ports.js";
+import type { SlackGateway, NotionWriter, DedupStore, Enricher } from "./ports.js";
 import type { Logger } from "../util/logger.js";
 
 export type CaptureStatus = "captured" | "flagger_added" | "duplicate" | "no_message" | "error";
@@ -19,6 +19,7 @@ export interface CaptureDeps {
   source: string;
   /** Bot's own Slack user ID. When set, stripped from captured text on @mention triggers. */
   botUserId?: string;
+  enricher: Enricher;
 }
 
 /**
@@ -93,6 +94,8 @@ export async function handleCapture(
 
     const dateIso = new Date(Number(req.messageTs) * 1000).toISOString().slice(0, 10);
 
+    const enrichment = await deps.enricher.enrich(text, channelName).catch(() => null);
+
     const pageId = await notion.createFeedback({
       message: text,
       channelName,
@@ -102,6 +105,8 @@ export async function handleCapture(
       source,
       messageUrl,
       customerAccount: "",
+      summary: enrichment?.summary,
+      category: enrichment?.category,
     });
 
     dedup.record(key, pageId);
