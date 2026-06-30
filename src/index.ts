@@ -5,10 +5,11 @@ import { NotionFeedbackWriter } from "./adapters/notion/notionWriter.js";
 import { LocalFeedbackWriter } from "./adapters/notion/localWriter.js";
 import { FileDedupStore } from "./adapters/dedup/fileStore.js";
 import { startSocketMode } from "./adapters/transport/socketMode.js";
+import { ClaudeEnricher } from "./adapters/enricher/claudeEnricher.js";
 import { NullEnricher } from "./adapters/enricher/nullEnricher.js";
 import { handleCapture, type CaptureDeps, type CaptureResult } from "./core/handleCapture.js";
 import type { CaptureRequest } from "./core/events.js";
-import type { SlackGateway, NotionWriter } from "./core/ports.js";
+import type { Enricher, SlackGateway, NotionWriter } from "./core/ports.js";
 
 const SUCCESS_EMOJI = "white_check_mark";
 const FAILURE_EMOJI = "warning";
@@ -62,6 +63,13 @@ async function main(): Promise<void> {
   const dedup = new FileDedupStore(config.dedupStorePath);
   logger.info(`Capture sink: ${config.captureSink}`);
 
+  const enricher: Enricher = config.anthropicApiKey
+    ? new ClaudeEnricher(config.anthropicApiKey)
+    : new NullEnricher();
+  logger.info(
+    config.anthropicApiKey ? "Enrichment enabled (Claude Haiku)" : "Enrichment disabled — set ANTHROPIC_API_KEY to enable",
+  );
+
   const deps: CaptureDeps = {
     slack,
     notion: feedbackWriter,
@@ -69,7 +77,7 @@ async function main(): Promise<void> {
     logger,
     source: "Slack",
     botUserId,
-    enricher: new NullEnricher(),
+    enricher,
   };
 
   // ...and wire them into the single handler the transport invokes. handleCapture is

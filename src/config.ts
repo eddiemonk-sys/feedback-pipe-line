@@ -11,6 +11,7 @@ export interface Config {
   capturesFilePath: string;
   triggerEmoji: string;
   dedupStorePath: string;
+  anthropicApiKey?: string;
 }
 
 function required(name: string): string {
@@ -39,6 +40,7 @@ export function loadConfig(): Config {
     capturesFilePath: (process.env.CAPTURES_FILE_PATH ?? "./data/captures.jsonl").trim(),
     triggerEmoji: (process.env.TRIGGER_EMOJI ?? "mega").trim(),
     dedupStorePath: (process.env.DEDUP_STORE_PATH ?? "./data/dedup.json").trim(),
+    anthropicApiKey: optional("ANTHROPIC_API_KEY"),
   };
 
   // Notion creds are only needed when actually writing to Notion.
