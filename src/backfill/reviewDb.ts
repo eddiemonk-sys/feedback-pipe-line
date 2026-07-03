@@ -111,4 +111,33 @@ export class BackfillReviewDb {
     } while (cursor);
     return decisions;
   }
+
+  /** Read EVERY reviewed row (confirmed + rejected) as raw label records for eval. */
+  async readAllRows(dbId: string): Promise<Array<Record<string, any>>> {
+    const rows: Array<Record<string, any>> = [];
+    let cursor: string | undefined;
+    do {
+      const res = await this.client.databases.query({ database_id: dbId, start_cursor: cursor });
+      for (const page of res.results as any[]) {
+        const p = page.properties;
+        const txt = (k: string) => p[k]?.rich_text?.[0]?.plain_text ?? p[k]?.title?.[0]?.plain_text ?? "";
+        rows.push({
+          channelId: txt("Channel ID"),
+          messageTs: txt("Message TS"),
+          message: txt("Message"),
+          gateConfidence: p["Gate Confidence"]?.select?.name ?? null,
+          gateRationale: txt("Gate Rationale"),
+          proposedCategory: p["Proposed Category"]?.select?.name ?? null,
+          proposedSummary: txt("Proposed Summary"),
+          isFeedback: !!p["Is Feedback?"]?.checkbox,
+          classificationOk: !!p["Classification OK?"]?.checkbox,
+          correctedCategory: p["Corrected Category"]?.select?.name ?? null,
+          correctedSummary: txt("Corrected Summary"),
+          correctionNotes: txt("Correction Notes"),
+        });
+      }
+      cursor = res.has_more ? res.next_cursor ?? undefined : undefined;
+    } while (cursor);
+    return rows;
+  }
 }
