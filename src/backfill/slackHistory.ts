@@ -50,11 +50,20 @@ export async function scanChannelHistory(
 
       // Thread parent: pull its replies too (feedback often lives in threads).
       if ((m as any).thread_ts && (m as any).reply_count) {
-        const replies = await client.conversations.replies({ channel: channelId, ts: (m as any).thread_ts });
-        for (const r of replies.messages ?? []) {
-          if (r.ts === (m as any).thread_ts) continue; // parent already handled
-          if (isScannable(toRaw(r), opts)) out.push(toCandidate(r));
-        }
+        let replyCursor: string | undefined;
+        do {
+          const replies = await client.conversations.replies({
+            channel: channelId,
+            ts: (m as any).thread_ts,
+            limit: 200,
+            cursor: replyCursor,
+          });
+          for (const r of replies.messages ?? []) {
+            if (r.ts === (m as any).thread_ts) continue; // parent already handled
+            if (isScannable(toRaw(r), opts)) out.push(toCandidate(r));
+          }
+          replyCursor = replies.response_metadata?.next_cursor || undefined;
+        } while (replyCursor);
       }
     }
     cursor = page.response_metadata?.next_cursor || undefined;

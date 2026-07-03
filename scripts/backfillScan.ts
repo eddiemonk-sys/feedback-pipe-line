@@ -45,46 +45,51 @@ async function main() {
 
   let kept = 0;
   for (const c of raw) {
-    // Vision first so image-only messages get a description the gate/enricher can use.
-    let visualDescription: string | undefined;
-    let imageUploadId: string | undefined;
-    const imageUrl = c.imageUrls?.[0];
-    if (imageUrl && visionEnabled) {
-      const img = await slack.downloadImage(imageUrl);
-      if (img) {
-        visualDescription = (await vision.describe(img, channelName))?.description;
-        imageUploadId = (await uploadImageToNotion(config.notionApiKey, img)) ?? undefined; // best-effort
+    try {
+      // Vision first so image-only messages get a description the gate/enricher can use.
+      let visualDescription: string | undefined;
+      let imageUploadId: string | undefined;
+      const imageUrl = c.imageUrls?.[0];
+      if (imageUrl && visionEnabled) {
+        const img = await slack.downloadImage(imageUrl);
+        if (img) {
+          visualDescription = (await vision.describe(img, channelName))?.description;
+          imageUploadId = (await uploadImageToNotion(config.notionApiKey, img)) ?? undefined; // best-effort
+        }
       }
+      const gateInput = visualDescription
+        ? (c.text.trim() ? `${c.text}\n\n[Attached screenshot shows: ${visualDescription}]` : `[Screenshot only. Shows: ${visualDescription}]`)
+        : c.text;
+
+      const verdict = await gate.classify(gateInput, channelName);
+      if (!verdict?.isLikelyFeedback) continue; // high recall, but skip clear non-feedback
+      kept++;
+
+      const enrichment = await enricher.enrich(gateInput, channelName).catch(() => null);
+      const [authorName, slackUrl] = await Promise.all([
+        slack.resolveUserName(c.user),
+        slack.getPermalink(CHANNEL_ID, c.ts),
+      ]);
+
+      await reviewDb.addCandidate(dbId, {
+        channelId: CHANNEL_ID,
+        messageTs: c.ts,
+        message: c.text,
+        authorName,
+        dateIso: new Date(Number(c.ts) * 1000).toISOString().slice(0, 10),
+        slackUrl,
+        proposedCategory: enrichment?.category,
+        proposedSummary: enrichment?.summary,
+        visualDescription,
+        gateConfidence: verdict.confidence,
+        gateRationale: verdict.rationale,
+        imageUploadId,
+      });
+      logger.info(`  + candidate ${c.ts} (${verdict.confidence})`);
+    } catch (err) {
+      logger.warn(`Skipping candidate ${c.ts} after error`, { err: String(err) });
+      continue;
     }
-    const gateInput = visualDescription
-      ? (c.text.trim() ? `${c.text}\n\n[Attached screenshot shows: ${visualDescription}]` : `[Screenshot only. Shows: ${visualDescription}]`)
-      : c.text;
-
-    const verdict = await gate.classify(gateInput, channelName);
-    if (!verdict?.isLikelyFeedback) continue; // high recall, but skip clear non-feedback
-    kept++;
-
-    const enrichment = await enricher.enrich(gateInput, channelName).catch(() => null);
-    const [authorName, slackUrl] = await Promise.all([
-      slack.resolveUserName(c.user),
-      slack.getPermalink(CHANNEL_ID, c.ts),
-    ]);
-
-    await reviewDb.addCandidate(dbId, {
-      channelId: CHANNEL_ID,
-      messageTs: c.ts,
-      message: c.text,
-      authorName,
-      dateIso: new Date(Number(c.ts) * 1000).toISOString().slice(0, 10),
-      slackUrl,
-      proposedCategory: enrichment?.category,
-      proposedSummary: enrichment?.summary,
-      visualDescription,
-      gateConfidence: verdict.confidence,
-      gateRationale: verdict.rationale,
-      imageUploadId,
-    });
-    logger.info(`  + candidate ${c.ts} (${verdict.confidence})`);
   }
 
   logger.info(`Done. ${kept} candidate(s) written to the review DB. Review them in Notion, then run backfillCapture.`);
