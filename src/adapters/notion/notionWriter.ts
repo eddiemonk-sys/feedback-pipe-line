@@ -9,7 +9,9 @@ const MAX_TEXT = 2000;
  * the live "Customer Feedback" data source (verified). The DB has a single data source,
  * so we use the stable `parent: { database_id }` path on API version 2022-06-28.
  *
- * "Customer/Account" must be added to the Notion DB (type: Text) before go-live.
+ * "Customer/Account", "Enrichment Confidence" (select), "Judge Rationale" (text),
+ * "Visual Description" (text), and "AI Suggested Category" (select, same options as
+ * Category) must all exist on the Notion DB before use.
  */
 export class NotionFeedbackWriter implements NotionWriter {
   private client: Client;
@@ -39,6 +41,16 @@ export class NotionFeedbackWriter implements NotionWriter {
           ? { Summary: { rich_text: [{ text: { content: r.summary.slice(0, MAX_TEXT) } }] } }
           : {}),
         ...(r.category ? { Category: { select: { name: r.category } } } : {}),
+        ...(r.aiSuggestedCategory
+          ? { "AI Suggested Category": { select: { name: r.aiSuggestedCategory } } }
+          : {}),
+        ...(r.confidence ? { "Enrichment Confidence": { select: { name: r.confidence } } } : {}),
+        ...(r.rationale
+          ? { "Judge Rationale": { rich_text: [{ text: { content: r.rationale.slice(0, MAX_TEXT) } }] } }
+          : {}),
+        ...(r.visualDescription
+          ? { "Visual Description": { rich_text: [{ text: { content: r.visualDescription.slice(0, MAX_TEXT) } }] } }
+          : {}),
       },
     });
     return page.id;

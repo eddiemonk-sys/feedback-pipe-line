@@ -12,6 +12,8 @@ export interface Config {
   triggerEmoji: string;
   dedupStorePath: string;
   anthropicApiKey?: string;
+  /** Channels where screenshots may be sent to Claude vision. Empty = disabled everywhere (fail closed). */
+  visionEnabledChannelIds: string[];
 }
 
 function required(name: string): string {
@@ -41,6 +43,10 @@ export function loadConfig(): Config {
     triggerEmoji: (process.env.TRIGGER_EMOJI ?? "mega").trim(),
     dedupStorePath: (process.env.DEDUP_STORE_PATH ?? "./data/dedup.json").trim(),
     anthropicApiKey: optional("ANTHROPIC_API_KEY"),
+    visionEnabledChannelIds: (process.env.VISION_ENABLED_CHANNEL_IDS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
   };
 
   // Notion creds are only needed when actually writing to Notion.

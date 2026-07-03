@@ -3,13 +3,17 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "description": "Slice 2 — Slack :mega: reaction -> Notion 'Customer Feedback' capture bot (Socket Mode).",
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/core/handleCapture.test.ts",
-    "setup:test-db": "tsx scripts/createTestDb.ts"
+    "test": "node --import tsx --test src/core/*.test.ts",
+    "setup:test-db": "tsx scripts/createTestDb.ts",
+    "report": "tsx scripts/accuracyReport.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.107.0",

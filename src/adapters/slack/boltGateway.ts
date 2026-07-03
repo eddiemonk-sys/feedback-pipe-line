@@ -1,6 +1,15 @@
 import { WebClient } from "@slack/web-api";
-import type { SlackGateway, SlackMessage } from "../../core/ports.js";
+import type { ImageAttachment, SlackGateway, SlackMessage } from "../../core/ports.js";
 import type { Logger } from "../../util/logger.js";
+
+function extractImageUrls(files?: Array<{ mimetype?: string; url_private?: string }>): string[] | undefined {
+  const urls = (files ?? [])
+    .filter((f): f is { mimetype: string; url_private: string } =>
+      !!f.mimetype?.startsWith("image/") && !!f.url_private,
+    )
+    .map((f) => f.url_private);
+  return urls.length ? urls : undefined;
+}
 
 /**
  * SlackGateway implementation backed by Slack's Web API. This is the only Slack-data
@@ -12,7 +21,7 @@ export class BoltSlackGateway implements SlackGateway {
   private userCache = new Map<string, string>();
   private channelCache = new Map<string, string>();
 
-  constructor(botToken: string, private logger: Logger) {
+  constructor(private botToken: string, private logger: Logger) {
     this.client = new WebClient(botToken);
   }
 
@@ -26,17 +35,37 @@ export class BoltSlackGateway implements SlackGateway {
       limit: 1,
     });
     const top = hist.messages?.find((m) => m.ts === ts);
-    if (top) return { text: top.text ?? "", authorUserId: top.user ?? "" };
+    if (top) {
+      return { text: top.text ?? "", authorUserId: top.user ?? "", imageUrls: extractImageUrls(top.files) };
+    }
 
     // Fall back to a threaded reply (Slack resolves a reply ts to its thread).
     try {
       const replies = await this.client.conversations.replies({ channel: channelId, ts });
       const reply = replies.messages?.find((m) => m.ts === ts);
-      if (reply) return { text: reply.text ?? "", authorUserId: reply.user ?? "" };
+      if (reply) {
+        return { text: reply.text ?? "", authorUserId: reply.user ?? "", imageUrls: extractImageUrls(reply.files) };
+      }
     } catch (err) {
       this.logger.warn("conversations.replies fallback failed", { err: String(err) });
     }
     return null;
+  }
+
+  async downloadImage(url: string): Promise<ImageAttachment | null> {
+    try {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${this.botToken}` } });
+      if (!res.ok) {
+        this.logger.warn("Failed to download image", { url, status: res.status });
+        return null;
+      }
+      const buffer = await res.arrayBuffer();
+      const mimeType = res.headers.get("content-type") ?? "image/png";
+      return { data: Buffer.from(buffer).toString("base64"), mimeType };
+    } catch (err) {
+      this.logger.warn("Failed to download image", { url, err: String(err) });
+      return null;
+    }
   }
 
   async resolveUserName(userId: string): Promise<string> {

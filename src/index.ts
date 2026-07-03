@@ -7,9 +7,13 @@ import { FileDedupStore } from "./adapters/dedup/fileStore.js";
 import { startSocketMode } from "./adapters/transport/socketMode.js";
 import { ClaudeEnricher } from "./adapters/enricher/claudeEnricher.js";
 import { NullEnricher } from "./adapters/enricher/nullEnricher.js";
+import { ClaudeJudge } from "./adapters/judge/claudeJudge.js";
+import { NullJudge } from "./adapters/judge/nullJudge.js";
+import { ClaudeVisionReader } from "./adapters/vision/claudeVisionReader.js";
+import { NullVisionReader } from "./adapters/vision/nullVisionReader.js";
 import { handleCapture, type CaptureDeps, type CaptureResult } from "./core/handleCapture.js";
 import type { CaptureRequest } from "./core/events.js";
-import type { Enricher, SlackGateway, NotionWriter } from "./core/ports.js";
+import type { Enricher, Judge, VisionReader, SlackGateway, NotionWriter } from "./core/ports.js";
 
 const SUCCESS_EMOJI = "white_check_mark";
 const FAILURE_EMOJI = "warning";
@@ -70,6 +74,23 @@ async function main(): Promise<void> {
     config.anthropicApiKey ? "Enrichment enabled (Claude Haiku)" : "Enrichment disabled — set ANTHROPIC_API_KEY to enable",
   );
 
+  const judge: Judge = config.anthropicApiKey
+    ? new ClaudeJudge(config.anthropicApiKey)
+    : new NullJudge();
+  logger.info(
+    config.anthropicApiKey ? "Judging enabled (category + summary checks)" : "Judging disabled — set ANTHROPIC_API_KEY to enable",
+  );
+
+  const vision: VisionReader = config.anthropicApiKey
+    ? new ClaudeVisionReader(config.anthropicApiKey)
+    : new NullVisionReader();
+  const visionEnabledChannelIds = new Set(config.visionEnabledChannelIds);
+  logger.info(
+    visionEnabledChannelIds.size > 0
+      ? `Vision enabled for ${visionEnabledChannelIds.size} channel(s)`
+      : "Vision disabled — set VISION_ENABLED_CHANNEL_IDS to enable for specific channels",
+  );
+
   const deps: CaptureDeps = {
     slack,
     notion: feedbackWriter,
@@ -78,6 +99,9 @@ async function main(): Promise<void> {
     source: "Slack",
     botUserId,
     enricher,
+    judge,
+    vision,
+    visionEnabledChannelIds,
   };
 
   // ...and wire them into the single handler the transport invokes. handleCapture is

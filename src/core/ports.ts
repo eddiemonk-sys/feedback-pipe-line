@@ -8,6 +8,13 @@
 export interface SlackMessage {
   text: string;
   authorUserId: string;
+  /** Private Slack URLs for any image files attached to the message. */
+  imageUrls?: string[];
+}
+
+export interface ImageAttachment {
+  data: string; // base64-encoded
+  mimeType: string;
 }
 
 /** Read from / act on Slack, abstracted away from any specific SDK or transport. */
@@ -24,6 +31,8 @@ export interface SlackGateway {
   addReaction(channelId: string, ts: string, emoji: string): Promise<void>;
   /** Post a threaded reply in the given channel/thread (used for @mention acks). */
   postReply(channelId: string, threadTs: string, text: string): Promise<void>;
+  /** Download an authenticated Slack file URL (e.g. from SlackMessage.imageUrls). */
+  downloadImage(url: string): Promise<ImageAttachment | null>;
 }
 
 /** One row of the Notion "Customer Feedback" database. */
@@ -38,6 +47,10 @@ export interface FeedbackRecord {
   customerAccount: string;
   summary?: string;        // AI-generated; absent when enrichment is disabled or failed
   category?: FeedbackCategory; // AI-assigned; absent when enrichment is disabled or failed
+  aiSuggestedCategory?: FeedbackCategory; // frozen copy of `category` at write time — never edited after, so a later human correction to `category` stays diffable against what the AI originally said
+  confidence?: ConfidenceLevel; // judge's confidence in the above; absent when judging is disabled or failed
+  rationale?: string;      // judge's short rationale; absent when judging is disabled or failed
+  visualDescription?: string; // vision's description of an attached screenshot, when present
 }
 
 export interface NotionWriter {
@@ -65,7 +78,9 @@ export type FeedbackCategory =
   | "UX / Usability"
   | "Reporting / Data"
   | "Praise"
-  | "Other";
+  | "Other"
+  | "Candidate Experience"
+  | "Assessment Accuracy/Validity";
 
 export interface EnrichmentResult {
   summary: string;
@@ -74,4 +89,34 @@ export interface EnrichmentResult {
 
 export interface Enricher {
   enrich(text: string, channelName: string): Promise<EnrichmentResult | null>;
+}
+
+export type ConfidenceLevel = "High" | "Medium" | "Low";
+
+export interface JudgeVerdict {
+  confidence: ConfidenceLevel;
+  rationale: string;
+}
+
+/**
+ * Reviews an enrichment result against the original message (reference-grounded,
+ * not self-comparison) and returns a pointwise confidence + short rationale.
+ * Phase 1 scope: checks category-correctness and summary-faithfulness only.
+ */
+export interface Judge {
+  review(
+    originalMessage: string,
+    channelName: string,
+    summary: string,
+    category: FeedbackCategory,
+  ): Promise<JudgeVerdict | null>;
+}
+
+export interface VisionResult {
+  description: string;
+}
+
+/** Describes an attached screenshot. Scope: one image per message, description only (no OCR/coordinates). */
+export interface VisionReader {
+  describe(image: ImageAttachment, channelName: string): Promise<VisionResult | null>;
 }

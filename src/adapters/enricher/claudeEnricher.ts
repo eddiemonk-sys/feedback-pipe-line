@@ -1,18 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Enricher, EnrichmentResult, FeedbackCategory } from "../../core/ports.js";
+import { CATEGORIES } from "../../core/taxonomy.js";
 
-const CATEGORIES: FeedbackCategory[] = [
-  "Bug / Broken",
-  "Feature Request",
-  "Pricing / Commercial",
-  "Onboarding / Setup",
-  "UX / Usability",
-  "Reporting / Data",
-  "Praise",
-  "Other",
-];
-
-const SYSTEM_PROMPT = `You are a feedback classifier for a B2B SaaS company. Given a Slack message and its channel, produce a 1-2 sentence plain-English summary and classify it into exactly one category.
+const SYSTEM_PROMPT = `You are a feedback classifier for a B2B SaaS company providing HR / talent-assessment software. Given a Slack message and its channel, produce a 1-2 sentence plain-English summary and classify it into exactly one category.
 
 Categories and examples:
 - Bug / Broken: "The export button throws an error" → "Export feature is broken and throws an error when clicked."
@@ -23,6 +13,10 @@ Categories and examples:
 - Reporting / Data: "The pipeline report doesn't include withdrawn candidates" → "Pipeline report is missing withdrawn candidates from the data."
 - Praise: "The new search is so much faster, our team loves it!" → "User is very happy with the improved search speed."
 - Other: "Quick question about your roadmap" → "User has a general roadmap inquiry."
+- Candidate Experience: "A candidate said the assessment invite email looked like spam" → "Candidate found the assessment invite email untrustworthy-looking."
+- Assessment Accuracy/Validity: "The scoring doesn't seem to reflect how the candidate actually performed" → "User doubts the assessment's scoring accurately reflects candidate performance."
+
+Use Assessment Accuracy/Validity only when the concern is about whether the assessment MEASURES THE RIGHT THING or scores correctly — not general bugs or UX complaints about the assessment tool itself.
 
 Remove Slack noise (raw @mentions, filler phrases). Keep the summary factual and concise.`;
 
