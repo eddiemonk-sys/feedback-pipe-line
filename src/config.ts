@@ -14,6 +14,10 @@ export interface Config {
   anthropicApiKey?: string;
   /** Channels where screenshots may be sent to Claude vision. Empty = disabled everywhere (fail closed). */
   visionEnabledChannelIds: string[];
+  /** Notion page (shared with the integration) under which the Backfill Review DB is created. */
+  backfillReviewParentPageId?: string;
+  /** Slack user id credited as "Flagged By" on backfilled captures (defaults to bot). */
+  backfillFlaggedByUserId?: string;
 }
 
 function required(name: string): string {
@@ -47,6 +51,8 @@ export function loadConfig(): Config {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
+    backfillReviewParentPageId: optional("BACKFILL_REVIEW_PARENT_PAGE_ID"),
+    backfillFlaggedByUserId: optional("BACKFILL_FLAGGED_BY_USER_ID"),
   };
 
   // Notion creds are only needed when actually writing to Notion.
