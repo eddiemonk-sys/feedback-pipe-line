@@ -1,5 +1,5 @@
 import { Client } from "@notionhq/client";
-import type { NotionWriter, FeedbackRecord } from "../../core/ports.js";
+import type { NotionWriter, FeedbackRecord, FeedbackCategory } from "../../core/ports.js";
 
 /** Notion caps a single text content value at 2000 characters. */
 const MAX_TEXT = 2000;
@@ -77,5 +77,20 @@ export class NotionFeedbackWriter implements NotionWriter {
         "Flagged By": { rich_text: [{ text: { content: updated.slice(0, MAX_TEXT) } }] },
       },
     });
+  }
+
+  /**
+   * Backfill-only: overwrite the human-editable Category / Summary on an existing row.
+   * Leaves "AI Suggested Category" untouched so the AI's original call stays diffable.
+   */
+  async updateClassification(
+    pageId: string,
+    patch: { category?: FeedbackCategory; summary?: string },
+  ): Promise<void> {
+    const properties: Record<string, any> = {};
+    if (patch.category) properties["Category"] = { select: { name: patch.category } };
+    if (patch.summary) properties["Summary"] = { rich_text: [{ text: { content: patch.summary.slice(0, MAX_TEXT) } }] };
+    if (Object.keys(properties).length === 0) return;
+    await this.client.pages.update({ page_id: pageId, properties });
   }
 }
