@@ -44,3 +44,8 @@ test("classification not OK but no corrections provided => null (nothing to patc
   const d: ReviewDecision = { ...confirmed, classificationOk: false };
   assert.equal(correctionFor(d), null);
 });
+
+test("whitespace-only correctedSummary is not a correction", () => {
+  const d: ReviewDecision = { ...confirmed, classificationOk: false, correctedSummary: "   " };
+  assert.equal(correctionFor(d), null);
+});
