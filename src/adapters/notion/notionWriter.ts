@@ -93,4 +93,21 @@ export class NotionFeedbackWriter implements NotionWriter {
     if (Object.keys(properties).length === 0) return;
     await this.client.pages.update({ page_id: pageId, properties });
   }
+
+  /**
+   * Backfill-only: record that a human reviewed this row (the Phase A signal). Sets
+   * "Category Reviewed" = true and "Summary Verdict" per whether the summary was faithful.
+   * A human confirming an item during backfill IS that review — this avoids a second pass.
+   */
+  async markReviewed(pageId: string, summaryFaithful: boolean): Promise<void> {
+    await this.client.pages.update({
+      page_id: pageId,
+      properties: {
+        "Category Reviewed": { checkbox: true },
+        "Summary Verdict": {
+          select: { name: summaryFaithful ? "Confirmed Faithful" : "Confirmed Not Faithful" },
+        },
+      },
+    });
+  }
 }

@@ -43,7 +43,7 @@ async function main() {
   const decisions = await reviewDb.readDecisions(reviewDatabaseId);
   logger.info(`${decisions.length} confirmed feedback row(s) to capture.`);
 
-  let captured = 0, patched = 0, marked = 0;
+  let captured = 0, patched = 0, marked = 0, reviewed = 0;
   for (const d of decisions) {
     if (!d.channelId || !d.messageTs) { logger.warn("Row missing Channel ID / Message TS — skipping", { d }); continue; }
     const req = toCaptureRequest(d, triggeredBy);
@@ -58,12 +58,18 @@ async function main() {
     const pageId = dedup.getPageId(dedupKey(req));
     if (correction && pageId) { await notion.updateClassification(pageId, correction); patched++; }
 
+    // The human's backfill confirmation IS the Phase A review — record it so no second pass is needed.
+    if (pageId) {
+      await notion.markReviewed(pageId, !d.correctedSummary?.trim());
+      reviewed++;
+    }
+
     // Add the visible :mega: marker to the original Slack message.
     await slack.addReaction(d.channelId, d.messageTs, MEGA);
     marked++;
   }
   dedup.close();
-  logger.info(`Done. captured=${captured} patched=${patched} mega_marked=${marked}`);
+  logger.info(`Done. captured=${captured} patched=${patched} reviewed=${reviewed} mega_marked=${marked}`);
 }
 
 main().catch((err) => { console.error("Capture failed:", err?.body ?? err); process.exit(1); });
