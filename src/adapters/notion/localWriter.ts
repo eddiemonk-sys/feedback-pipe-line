@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
-import { mkdirSync, appendFileSync } from "node:fs";
-import type { NotionWriter, FeedbackRecord } from "../../core/ports.js";
+import { mkdirSync, appendFileSync, readFileSync, existsSync } from "node:fs";
+import type { NotionWriter, FeedbackRecord, FeedbackCategory } from "../../core/ports.js";
 import type { Logger } from "../../util/logger.js";
 
 let localIdSeq = 0;
@@ -36,5 +36,28 @@ export class LocalFeedbackWriter implements NotionWriter {
     });
     appendFileSync(this.filePath, line + "\n", "utf8");
     this.logger.info("Appended flagger to local file", { pageId, newFlaggerName });
+  }
+
+  async findRecentByCategory(
+    category: FeedbackCategory,
+    sinceDateIso: string,
+  ): Promise<Array<{ pageId: string; summary: string }>> {
+    if (!existsSync(this.filePath)) return [];
+
+    const lines = readFileSync(this.filePath, "utf8").trim().split("\n").filter(Boolean);
+    const candidates: Array<{ pageId: string; summary: string }> = [];
+
+    for (const line of lines) {
+      try {
+        const record = JSON.parse(line);
+        if (record.category !== category || !record.summary) continue;
+        if (record.dateIso && record.dateIso < sinceDateIso) continue;
+        if (record.id) candidates.push({ pageId: record.id, summary: record.summary });
+      } catch {
+        continue; // skip malformed lines (e.g. the flagger-added event lines)
+      }
+    }
+
+    return candidates;
   }
 }

@@ -48,9 +48,12 @@ export interface FeedbackRecord {
   summary?: string;        // AI-generated; absent when enrichment is disabled or failed
   category?: FeedbackCategory; // AI-assigned; absent when enrichment is disabled or failed
   aiSuggestedCategory?: FeedbackCategory; // frozen copy of `category` at write time — never edited after, so a later human correction to `category` stays diffable against what the AI originally said
+  aiSuggestedSummary?: string; // frozen copy of `summary` at write time — same reason as aiSuggestedCategory: correcting `summary` in place would otherwise destroy the AI's original wording
   confidence?: ConfidenceLevel; // judge's confidence in the above; absent when judging is disabled or failed
   rationale?: string;      // judge's short rationale; absent when judging is disabled or failed
   visualDescription?: string; // vision's description of an attached screenshot, when present
+  relatedFeedbackPageId?: string; // an existing row this one appears to duplicate, when found
+  relatedFeedbackRationale?: string; // why the similarity detector linked them
 }
 
 export interface NotionWriter {
@@ -58,6 +61,8 @@ export interface NotionWriter {
   createFeedback(record: FeedbackRecord): Promise<string>;
   /** Append a new flagger name to the "Flagged By" field of an existing row. */
   appendFlagger(pageId: string, newFlaggerName: string): Promise<void>;
+  /** Recent rows in the same category, for similarity comparison. */
+  findRecentByCategory(category: FeedbackCategory, sinceDateIso: string): Promise<Array<{ pageId: string; summary: string }>>;
 }
 
 /** Dedup store keyed on a stable message key (channelId:messageTs). */
@@ -119,4 +124,22 @@ export interface VisionResult {
 /** Describes an attached screenshot. Scope: one image per message, description only (no OCR/coordinates). */
 export interface VisionReader {
   describe(image: ImageAttachment, channelName: string): Promise<VisionResult | null>;
+}
+
+export interface SimilarMatch {
+  matchedPageId: string;
+  rationale: string;
+}
+
+/**
+ * Detects whether a new capture duplicates an existing one, pointwise against a bounded
+ * set of recent same-category candidates — not a general similarity search. Fails open
+ * (null) on any error, same as Judge/VisionReader; a failed check must never block a capture.
+ */
+export interface SimilarityDetector {
+  findSimilar(
+    summary: string,
+    category: FeedbackCategory,
+    candidates: Array<{ pageId: string; summary: string }>,
+  ): Promise<SimilarMatch | null>;
 }

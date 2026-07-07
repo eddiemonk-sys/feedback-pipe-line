@@ -14,6 +14,8 @@ export interface Config {
   anthropicApiKey?: string;
   /** Channels where screenshots may be sent to Claude vision. Empty = disabled everywhere (fail closed). */
   visionEnabledChannelIds: string[];
+  /** How far back to look for a possible duplicate when checking for related feedback. */
+  similarityWindowDays: number;
 }
 
 function required(name: string): string {
@@ -47,6 +49,7 @@ export function loadConfig(): Config {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
+    similarityWindowDays: Number(process.env.SIMILARITY_WINDOW_DAYS ?? "30"),
   };
 
   // Notion creds are only needed when actually writing to Notion.

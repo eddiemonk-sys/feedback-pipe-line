@@ -1,8 +1,11 @@
 import { Client } from "@notionhq/client";
-import type { NotionWriter, FeedbackRecord } from "../../core/ports.js";
+import type { NotionWriter, FeedbackRecord, FeedbackCategory } from "../../core/ports.js";
 
 /** Notion caps a single text content value at 2000 characters. */
 const MAX_TEXT = 2000;
+
+/** Bounds the candidate set sent to the similarity detector — this is a duplicate check, not a general report. */
+const MAX_RECENT_CANDIDATES = 30;
 
 /**
  * NotionWriter implementation using the official Notion REST API. Property names match
@@ -10,8 +13,10 @@ const MAX_TEXT = 2000;
  * so we use the stable `parent: { database_id }` path on API version 2022-06-28.
  *
  * "Customer/Account", "Enrichment Confidence" (select), "Judge Rationale" (text),
- * "Visual Description" (text), and "AI Suggested Category" (select, same options as
- * Category) must all exist on the Notion DB before use.
+ * "Visual Description" (text), "AI Suggested Category" (select, same options as
+ * Category), "AI Suggested Summary" (text), "Related Feedback" (relation,
+ * self-referencing), and "Related Feedback Rationale" (text) must all exist on the
+ * Notion DB before use.
  */
 export class NotionFeedbackWriter implements NotionWriter {
   private client: Client;
@@ -44,12 +49,25 @@ export class NotionFeedbackWriter implements NotionWriter {
         ...(r.aiSuggestedCategory
           ? { "AI Suggested Category": { select: { name: r.aiSuggestedCategory } } }
           : {}),
+        ...(r.aiSuggestedSummary
+          ? { "AI Suggested Summary": { rich_text: [{ text: { content: r.aiSuggestedSummary.slice(0, MAX_TEXT) } }] } }
+          : {}),
         ...(r.confidence ? { "Enrichment Confidence": { select: { name: r.confidence } } } : {}),
         ...(r.rationale
           ? { "Judge Rationale": { rich_text: [{ text: { content: r.rationale.slice(0, MAX_TEXT) } }] } }
           : {}),
         ...(r.visualDescription
           ? { "Visual Description": { rich_text: [{ text: { content: r.visualDescription.slice(0, MAX_TEXT) } }] } }
+          : {}),
+        ...(r.relatedFeedbackPageId
+          ? { "Related Feedback": { relation: [{ id: r.relatedFeedbackPageId }] } }
+          : {}),
+        ...(r.relatedFeedbackRationale
+          ? {
+              "Related Feedback Rationale": {
+                rich_text: [{ text: { content: r.relatedFeedbackRationale.slice(0, MAX_TEXT) } }],
+              },
+            }
           : {}),
       },
     });
@@ -77,5 +95,28 @@ export class NotionFeedbackWriter implements NotionWriter {
         "Flagged By": { rich_text: [{ text: { content: updated.slice(0, MAX_TEXT) } }] },
       },
     });
+  }
+
+  async findRecentByCategory(
+    category: FeedbackCategory,
+    sinceDateIso: string,
+  ): Promise<Array<{ pageId: string; summary: string }>> {
+    const res: any = await this.client.databases.query({
+      database_id: this.databaseId,
+      filter: {
+        and: [
+          { property: "Category", select: { equals: category } },
+          { property: "Date", date: { on_or_after: sinceDateIso } },
+        ],
+      },
+      page_size: MAX_RECENT_CANDIDATES,
+    });
+
+    return res.results
+      .map((page: any) => ({
+        pageId: page.id as string,
+        summary: (page.properties?.["Summary"]?.rich_text?.[0]?.plain_text as string) ?? "",
+      }))
+      .filter((c: { summary: string }) => c.summary); // nothing to compare without a summary
   }
 }

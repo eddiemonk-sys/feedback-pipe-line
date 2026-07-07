@@ -21,6 +21,9 @@ function makeDeps() {
   const downloadCalls: string[] = [];
   const visionCalls: Array<{ data: string; mimeType: string; channelName: string }> = [];
   const enrichCalls: string[] = [];
+  const recentByCategoryCalls: Array<{ category: FeedbackCategory; sinceDateIso: string }> = [];
+  const similarityCalls: Array<{ summary: string; category: FeedbackCategory; candidates: Array<{ pageId: string; summary: string }> }> = [];
+  let recentCandidates: Array<{ pageId: string; summary: string }> = [];
 
   const deps: CaptureDeps = {
     logger: silentLogger,
@@ -38,6 +41,10 @@ function makeDeps() {
       },
       appendFlagger: async (pageId, name) => {
         appendedFlaggers.push({ pageId, name });
+      },
+      findRecentByCategory: async (category, sinceDateIso) => {
+        recentByCategoryCalls.push({ category, sinceDateIso });
+        return recentCandidates;
       },
     },
     slack: {
@@ -74,8 +81,19 @@ function makeDeps() {
       },
     },
     visionEnabledChannelIds: new Set(["C123"]),
+    similarityDetector: {
+      findSimilar: async (summary, category, candidates) => {
+        similarityCalls.push({ summary, category, candidates });
+        return null;
+      },
+    },
+    similarityWindowDays: 30,
   };
-  return { deps, writes, appendedFlaggers, store, judgeCalls, downloadCalls, visionCalls, enrichCalls };
+  return {
+    deps, writes, appendedFlaggers, store, judgeCalls, downloadCalls, visionCalls, enrichCalls,
+    recentByCategoryCalls, similarityCalls,
+    setRecentCandidates: (c: Array<{ pageId: string; summary: string }>) => { recentCandidates = c; },
+  };
 }
 
 test("captures a new message and records the dedup key with page ID", async () => {
@@ -167,6 +185,20 @@ test("leaves aiSuggestedCategory undefined when enrichment is disabled or failed
   deps.enricher.enrich = async () => null;
   await handleCapture(req, deps);
   assert.equal(writes[0].aiSuggestedCategory, undefined);
+});
+
+test("freezes a copy of the summary into aiSuggestedSummary at write time", async () => {
+  const { deps, writes } = makeDeps();
+  await handleCapture(req, deps);
+  assert.equal(writes[0].aiSuggestedSummary, "Customer wants SSO integration.");
+  assert.equal(writes[0].aiSuggestedSummary, writes[0].summary);
+});
+
+test("leaves aiSuggestedSummary undefined when enrichment is disabled or failed", async () => {
+  const { deps, writes } = makeDeps();
+  deps.enricher.enrich = async () => null;
+  await handleCapture(req, deps);
+  assert.equal(writes[0].aiSuggestedSummary, undefined);
 });
 
 test("writes feedback without enrichment when enricher returns null", async () => {
@@ -319,4 +351,62 @@ test("the raw Notion Message field is unaffected by the vision description", asy
   });
   await handleCapture(req, deps);
   assert.equal(writes[0].message, "Getting this error, see screenshot");
+});
+
+test("checks recent same-category candidates against the new summary", async () => {
+  const { deps, recentByCategoryCalls, similarityCalls, setRecentCandidates } = makeDeps();
+  setRecentCandidates([{ pageId: "page_old", summary: "An older, unrelated report." }]);
+  await handleCapture(req, deps);
+  assert.equal(recentByCategoryCalls.length, 1);
+  assert.equal(recentByCategoryCalls[0].category, "Feature Request");
+  assert.match(recentByCategoryCalls[0].sinceDateIso, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(similarityCalls.length, 1);
+  assert.equal(similarityCalls[0].summary, "Customer wants SSO integration.");
+  assert.equal(similarityCalls[0].category, "Feature Request");
+  assert.deepEqual(similarityCalls[0].candidates, [{ pageId: "page_old", summary: "An older, unrelated report." }]);
+});
+
+test("links to the matched page when a similarity match is found", async () => {
+  const { deps, writes, setRecentCandidates } = makeDeps();
+  setRecentCandidates([{ pageId: "page_old", summary: "SSO login is broken for our team." }]);
+  deps.similarityDetector.findSimilar = async () => ({
+    matchedPageId: "page_old",
+    rationale: "Both describe SSO login being unavailable.",
+  });
+  await handleCapture(req, deps);
+  assert.equal(writes[0].relatedFeedbackPageId, "page_old");
+  assert.equal(writes[0].relatedFeedbackRationale, "Both describe SSO login being unavailable.");
+});
+
+test("leaves related feedback fields undefined when no match is found", async () => {
+  const { deps, writes } = makeDeps();
+  await handleCapture(req, deps); // default findSimilar returns null
+  assert.equal(writes[0].relatedFeedbackPageId, undefined);
+  assert.equal(writes[0].relatedFeedbackRationale, undefined);
+});
+
+test("does not check for similarity when enrichment is disabled or failed", async () => {
+  const { deps, writes, recentByCategoryCalls, similarityCalls } = makeDeps();
+  deps.enricher.enrich = async () => null;
+  await handleCapture(req, deps);
+  assert.equal(recentByCategoryCalls.length, 0);
+  assert.equal(similarityCalls.length, 0);
+  assert.equal(writes[0].relatedFeedbackPageId, undefined);
+});
+
+test("writes feedback without a related link when fetching recent candidates fails", async () => {
+  const { deps, writes } = makeDeps();
+  deps.notion.findRecentByCategory = async () => { throw new Error("Notion query failed"); };
+  const res = await handleCapture(req, deps);
+  assert.equal(res.status, "captured");
+  assert.equal(writes[0].relatedFeedbackPageId, undefined);
+});
+
+test("writes feedback without a related link when the similarity detector fails", async () => {
+  const { deps, writes, setRecentCandidates } = makeDeps();
+  setRecentCandidates([{ pageId: "page_old", summary: "An older report." }]); // non-empty, so findSimilar actually gets called
+  deps.similarityDetector.findSimilar = async () => { throw new Error("detector down"); };
+  const res = await handleCapture(req, deps);
+  assert.equal(res.status, "captured");
+  assert.equal(writes[0].relatedFeedbackPageId, undefined);
 });

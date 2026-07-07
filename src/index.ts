@@ -11,9 +11,11 @@ import { ClaudeJudge } from "./adapters/judge/claudeJudge.js";
 import { NullJudge } from "./adapters/judge/nullJudge.js";
 import { ClaudeVisionReader } from "./adapters/vision/claudeVisionReader.js";
 import { NullVisionReader } from "./adapters/vision/nullVisionReader.js";
+import { ClaudeSimilarityDetector } from "./adapters/similarity/claudeSimilarityDetector.js";
+import { NullSimilarityDetector } from "./adapters/similarity/nullSimilarityDetector.js";
 import { handleCapture, type CaptureDeps, type CaptureResult } from "./core/handleCapture.js";
 import type { CaptureRequest } from "./core/events.js";
-import type { Enricher, Judge, VisionReader, SlackGateway, NotionWriter } from "./core/ports.js";
+import type { Enricher, Judge, VisionReader, SimilarityDetector, SlackGateway, NotionWriter } from "./core/ports.js";
 
 const SUCCESS_EMOJI = "white_check_mark";
 const FAILURE_EMOJI = "warning";
@@ -91,6 +93,15 @@ async function main(): Promise<void> {
       : "Vision disabled — set VISION_ENABLED_CHANNEL_IDS to enable for specific channels",
   );
 
+  const similarityDetector: SimilarityDetector = config.anthropicApiKey
+    ? new ClaudeSimilarityDetector(config.anthropicApiKey)
+    : new NullSimilarityDetector();
+  logger.info(
+    config.anthropicApiKey
+      ? `Related-feedback detection enabled (${config.similarityWindowDays}-day window)`
+      : "Related-feedback detection disabled — set ANTHROPIC_API_KEY to enable",
+  );
+
   const deps: CaptureDeps = {
     slack,
     notion: feedbackWriter,
@@ -102,6 +113,8 @@ async function main(): Promise<void> {
     judge,
     vision,
     visionEnabledChannelIds,
+    similarityDetector,
+    similarityWindowDays: config.similarityWindowDays,
   };
 
   // ...and wire them into the single handler the transport invokes. handleCapture is

@@ -1,5 +1,5 @@
 import type { CaptureRequest } from "./events.js";
-import type { SlackGateway, NotionWriter, DedupStore, Enricher, Judge, VisionReader } from "./ports.js";
+import type { SlackGateway, NotionWriter, DedupStore, Enricher, Judge, VisionReader, SimilarityDetector } from "./ports.js";
 import type { Logger } from "../util/logger.js";
 
 export type CaptureStatus = "captured" | "flagger_added" | "duplicate" | "no_message" | "error";
@@ -24,6 +24,9 @@ export interface CaptureDeps {
   vision: VisionReader;
   /** Channels where screenshots may be sent for vision processing. Empty = nowhere. */
   visionEnabledChannelIds: Set<string>;
+  similarityDetector: SimilarityDetector;
+  /** How far back to look for a possible duplicate, in days. */
+  similarityWindowDays: number;
 }
 
 /**
@@ -129,6 +132,8 @@ export async function handleCapture(
           })
       : null;
 
+    const relatedMatch = enrichment ? await findRelatedFeedback(deps, enrichment.summary, enrichment.category, logger) : null;
+
     const pageId = await notion.createFeedback({
       message: text,
       channelName,
@@ -141,9 +146,12 @@ export async function handleCapture(
       summary: enrichment?.summary,
       category: enrichment?.category,
       aiSuggestedCategory: enrichment?.category,
+      aiSuggestedSummary: enrichment?.summary,
       confidence: verdict?.confidence,
       rationale: verdict?.rationale,
       visualDescription,
+      relatedFeedbackPageId: relatedMatch?.matchedPageId,
+      relatedFeedbackRationale: relatedMatch?.rationale,
     });
 
     dedup.record(key, pageId);
@@ -152,6 +160,26 @@ export async function handleCapture(
   } catch (err) {
     logger.error("Failed to write feedback to Notion", { key, err: String(err) });
     return { status: "error", key, detail: "notion.createFeedback failed" };
+  }
+}
+
+/** Checks recent same-category captures for a likely duplicate; fails open (null) on any error. */
+async function findRelatedFeedback(
+  deps: CaptureDeps,
+  summary: string,
+  category: import("./ports.js").FeedbackCategory,
+  logger: Logger,
+): Promise<import("./ports.js").SimilarMatch | null> {
+  try {
+    const sinceDateIso = new Date(Date.now() - deps.similarityWindowDays * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const candidates = await deps.notion.findRecentByCategory(category, sinceDateIso);
+    if (candidates.length === 0) return null;
+    return await deps.similarityDetector.findSimilar(summary, category, candidates);
+  } catch (err) {
+    logger.warn("Similarity check failed — capturing without a related-feedback link", { err: String(err) });
+    return null;
   }
 }
 
