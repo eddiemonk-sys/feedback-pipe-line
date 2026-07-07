@@ -7,3 +7,7 @@ dist/
 .superpowers/
 ~$*
 .worktrees/
+
+# Correction logs — raw verbatim customer text; distilled by hand into docs/*.md guides
+enrichment-correction-log.md
+similarity-correction-log.md
