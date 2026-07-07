@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Enricher, EnrichmentResult, FeedbackCategory } from "../../core/ports.js";
 import { CATEGORIES } from "../../core/taxonomy.js";
+import { appendGuidance } from "../../core/promptGuidance.js";
 
 const SYSTEM_PROMPT = `You are a feedback classifier for a B2B SaaS company providing HR / talent-assessment software. Given a Slack message and its channel, produce a 1-2 sentence plain-English summary and classify it into exactly one category.
 
@@ -22,9 +23,11 @@ Remove Slack noise (raw @mentions, filler phrases). Keep the summary factual and
 
 export class ClaudeEnricher implements Enricher {
   private client: Anthropic;
+  private systemPrompt: string;
 
-  constructor(apiKey: string, private model = "claude-haiku-4-5-20251001") {
+  constructor(apiKey: string, styleGuide?: string, private model = "claude-haiku-4-5-20251001") {
     this.client = new Anthropic({ apiKey });
+    this.systemPrompt = appendGuidance(SYSTEM_PROMPT, styleGuide);
   }
 
   async enrich(text: string, channelName: string): Promise<EnrichmentResult | null> {
@@ -32,7 +35,7 @@ export class ClaudeEnricher implements Enricher {
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: 256,
-        system: SYSTEM_PROMPT,
+        system: this.systemPrompt,
         messages: [
           {
             role: "user",

@@ -7,6 +7,7 @@ import { BoltSlackGateway } from "../src/adapters/slack/boltGateway.js";
 import { NotionFeedbackWriter } from "../src/adapters/notion/notionWriter.js";
 import { FileDedupStore } from "../src/adapters/dedup/fileStore.js";
 import { ClaudeEnricher } from "../src/adapters/enricher/claudeEnricher.js";
+import { loadGuideFile } from "../src/util/loadGuideFile.js";
 import { NullEnricher } from "../src/adapters/enricher/nullEnricher.js";
 import { ClaudeJudge } from "../src/adapters/judge/claudeJudge.js";
 import { NullJudge } from "../src/adapters/judge/nullJudge.js";
@@ -30,9 +31,10 @@ async function main() {
   const botUserId = await slack.getBotUserId();
   const notion = new NotionFeedbackWriter(config.notionApiKey, config.notionDatabaseId);
   const dedup = new FileDedupStore(config.dedupStorePath);
+  const enrichmentStyleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
   const deps: CaptureDeps = {
     slack, notion, dedup, logger, source: "Slack", botUserId,
-    enricher: config.anthropicApiKey ? new ClaudeEnricher(config.anthropicApiKey) : new NullEnricher(),
+    enricher: config.anthropicApiKey ? new ClaudeEnricher(config.anthropicApiKey, enrichmentStyleGuide) : new NullEnricher(),
     judge: config.anthropicApiKey ? new ClaudeJudge(config.anthropicApiKey) : new NullJudge(),
     vision: config.anthropicApiKey ? new ClaudeVisionReader(config.anthropicApiKey) : new NullVisionReader(),
     visionEnabledChannelIds: new Set(config.visionEnabledChannelIds),

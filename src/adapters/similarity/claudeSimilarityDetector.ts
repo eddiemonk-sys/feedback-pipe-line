@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { SimilarityDetector, SimilarMatch, FeedbackCategory } from "../../core/ports.js";
+import { appendGuidance } from "../../core/promptGuidance.js";
 
 const NONE = "none";
 
@@ -19,9 +20,11 @@ Respond with:
  */
 export class ClaudeSimilarityDetector implements SimilarityDetector {
   private client: Anthropic;
+  private systemPrompt: string;
 
-  constructor(apiKey: string, private model = "claude-haiku-4-5-20251001") {
+  constructor(apiKey: string, rulesGuide?: string, private model = "claude-haiku-4-5-20251001") {
     this.client = new Anthropic({ apiKey });
+    this.systemPrompt = appendGuidance(SYSTEM_PROMPT, rulesGuide);
   }
 
   async findSimilar(
@@ -40,7 +43,7 @@ export class ClaudeSimilarityDetector implements SimilarityDetector {
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: 256,
-        system: SYSTEM_PROMPT,
+        system: this.systemPrompt,
         messages: [
           {
             role: "user",

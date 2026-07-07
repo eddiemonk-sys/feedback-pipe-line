@@ -1,5 +1,6 @@
 import { loadConfig } from "./config.js";
 import { consoleLogger } from "./util/logger.js";
+import { loadGuideFile } from "./util/loadGuideFile.js";
 import { BoltSlackGateway } from "./adapters/slack/boltGateway.js";
 import { NotionFeedbackWriter } from "./adapters/notion/notionWriter.js";
 import { LocalFeedbackWriter } from "./adapters/notion/localWriter.js";
@@ -69,11 +70,14 @@ async function main(): Promise<void> {
   const dedup = new FileDedupStore(config.dedupStorePath);
   logger.info(`Capture sink: ${config.captureSink}`);
 
+  const enrichmentStyleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
   const enricher: Enricher = config.anthropicApiKey
-    ? new ClaudeEnricher(config.anthropicApiKey)
+    ? new ClaudeEnricher(config.anthropicApiKey, enrichmentStyleGuide)
     : new NullEnricher();
   logger.info(
-    config.anthropicApiKey ? "Enrichment enabled (Claude Haiku)" : "Enrichment disabled — set ANTHROPIC_API_KEY to enable",
+    config.anthropicApiKey
+      ? `Enrichment enabled (Claude Haiku)${enrichmentStyleGuide.trim() ? " + style guide" : ""}`
+      : "Enrichment disabled — set ANTHROPIC_API_KEY to enable",
   );
 
   const judge: Judge = config.anthropicApiKey
@@ -93,12 +97,13 @@ async function main(): Promise<void> {
       : "Vision disabled — set VISION_ENABLED_CHANNEL_IDS to enable for specific channels",
   );
 
+  const similarityRules = loadGuideFile(config.similarityRulesPath);
   const similarityDetector: SimilarityDetector = config.anthropicApiKey
-    ? new ClaudeSimilarityDetector(config.anthropicApiKey)
+    ? new ClaudeSimilarityDetector(config.anthropicApiKey, similarityRules)
     : new NullSimilarityDetector();
   logger.info(
     config.anthropicApiKey
-      ? `Related-feedback detection enabled (${config.similarityWindowDays}-day window)`
+      ? `Related-feedback detection enabled (${config.similarityWindowDays}-day window)${similarityRules.trim() ? " + rules guide" : ""}`
       : "Related-feedback detection disabled — set ANTHROPIC_API_KEY to enable",
   );
 

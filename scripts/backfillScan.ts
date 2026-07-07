@@ -7,6 +7,7 @@ import { BoltSlackGateway } from "../src/adapters/slack/boltGateway.js";
 import { ClaudeFeedbackGate } from "../src/adapters/gate/claudeFeedbackGate.js";
 import { NullFeedbackGate } from "../src/adapters/gate/nullFeedbackGate.js";
 import { ClaudeEnricher } from "../src/adapters/enricher/claudeEnricher.js";
+import { loadGuideFile } from "../src/util/loadGuideFile.js";
 import { NullEnricher } from "../src/adapters/enricher/nullEnricher.js";
 import { ClaudeVisionReader } from "../src/adapters/vision/claudeVisionReader.js";
 import { NullVisionReader } from "../src/adapters/vision/nullVisionReader.js";
@@ -27,7 +28,8 @@ async function main() {
   const slack = new BoltSlackGateway(config.slackBotToken, logger);
   const botUserId = await slack.getBotUserId();
   const gate = config.anthropicApiKey ? new ClaudeFeedbackGate(config.anthropicApiKey) : new NullFeedbackGate();
-  const enricher = config.anthropicApiKey ? new ClaudeEnricher(config.anthropicApiKey) : new NullEnricher();
+  const enrichmentStyleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
+  const enricher = config.anthropicApiKey ? new ClaudeEnricher(config.anthropicApiKey, enrichmentStyleGuide) : new NullEnricher();
   const vision = config.anthropicApiKey ? new ClaudeVisionReader(config.anthropicApiKey) : new NullVisionReader();
   const reviewDb = new BackfillReviewDb(config.notionApiKey);
   const visionEnabled = new Set(config.visionEnabledChannelIds).has(CHANNEL_ID);
