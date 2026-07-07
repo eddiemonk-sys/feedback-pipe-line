@@ -51,7 +51,13 @@ export function detectEnricherCorrections(rows: CorrectionRow[]): EnricherCorrec
         after: r.category,
       });
     }
-    if (r.summaryVerdict === "Confirmed Not Faithful" && r.aiSuggestedSummary && r.summary && r.category) {
+    if (
+      r.summaryVerdict === "Confirmed Not Faithful" &&
+      r.aiSuggestedSummary &&
+      r.summary &&
+      r.category &&
+      r.summary.trim() !== r.aiSuggestedSummary.trim() // a Not-Faithful flag with no actual edit isn't a correction
+    ) {
       out.push({
         pageId: r.pageId,
         kind: "summary",

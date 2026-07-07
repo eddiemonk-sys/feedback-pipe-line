@@ -89,6 +89,18 @@ test("skips a summary correction when the AI's original summary is missing (noth
   assert.equal(out.filter((c) => c.kind === "summary").length, 0);
 });
 
+test("skips a summary 'correction' when the text is unchanged (Not-Faithful flag without an edit)", () => {
+  const out = detectEnricherCorrections([
+    row({
+      summaryVerdict: "Confirmed Not Faithful",
+      aiSuggestedSummary: "User wants X.",
+      summary: "  User wants X.  ",
+      category: "Feature Request",
+    }),
+  ]);
+  assert.equal(out.filter((c) => c.kind === "summary").length, 0);
+});
+
 test("a single row can yield both a category and a summary correction", () => {
   const out = detectEnricherCorrections([
     row({
