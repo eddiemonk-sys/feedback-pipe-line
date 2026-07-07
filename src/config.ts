@@ -20,6 +20,10 @@ export interface Config {
   backfillReviewParentPageId?: string;
   /** Slack user id credited as "Flagged By" on backfilled captures (defaults to bot). */
   backfillFlaggedByUserId?: string;
+  /** Slack channel IDs the backfill scan reads history from (comma-separated in env). */
+  backfillChannelIds: string[];
+  /** How many weeks of history the backfill scan reads back. */
+  backfillWeeksBack: number;
   /** Path to the enricher's distilled style guide, appended to its system prompt at startup. */
   enrichmentStyleGuidePath: string;
   /** Path to the similarity detector's distilled rules guide, appended to its system prompt. */
@@ -60,6 +64,11 @@ export function loadConfig(): Config {
     similarityWindowDays: Number(process.env.SIMILARITY_WINDOW_DAYS ?? "30"),
     backfillReviewParentPageId: optional("BACKFILL_REVIEW_PARENT_PAGE_ID"),
     backfillFlaggedByUserId: optional("BACKFILL_FLAGGED_BY_USER_ID"),
+    backfillChannelIds: (process.env.BACKFILL_CHANNEL_IDS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    backfillWeeksBack: Number(process.env.BACKFILL_WEEKS_BACK ?? "8"),
     enrichmentStyleGuidePath: (process.env.ENRICHMENT_STYLE_GUIDE_PATH ?? "./docs/enrichment-style-guide.md").trim(),
     similarityRulesPath: (process.env.SIMILARITY_RULES_PATH ?? "./docs/similarity-rules.md").trim(),
   };
