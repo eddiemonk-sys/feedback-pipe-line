@@ -131,6 +131,15 @@ export interface SimilarMatch {
   rationale: string;
 }
 
+export interface FeedbackGateResult {
+  /** True if this message is plausibly customer feedback (high-recall bias). */
+  isLikelyFeedback: boolean;
+  /** How confident the gate is in that call. */
+  confidence: ConfidenceLevel;
+  /** One short sentence of reasoning, shown to the human reviewer. */
+  rationale: string;
+}
+
 /**
  * Detects whether a new capture duplicates an existing one, pointwise against a bounded
  * set of recent same-category candidates — not a general similarity search. Fails open
@@ -142,4 +151,13 @@ export interface SimilarityDetector {
     category: FeedbackCategory,
     candidates: Array<{ pageId: string; summary: string }>,
   ): Promise<SimilarMatch | null>;
+}
+
+/**
+ * Backfill-only gate: a scoped-down version of the deferred "is this feedback?" check
+ * (ENRICHMENT-DESIGN-DECISIONS.md §2). High-recall by design — a human confirms every hit.
+ * NOT wired into the live pipeline.
+ */
+export interface FeedbackGate {
+  classify(text: string, channelName: string): Promise<FeedbackGateResult | null>;
 }

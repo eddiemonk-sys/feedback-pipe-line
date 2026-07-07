@@ -2,7 +2,7 @@ import { WebClient } from "@slack/web-api";
 import type { ImageAttachment, SlackGateway, SlackMessage } from "../../core/ports.js";
 import type { Logger } from "../../util/logger.js";
 
-function extractImageUrls(files?: Array<{ mimetype?: string; url_private?: string }>): string[] | undefined {
+export function extractImageUrls(files?: Array<{ mimetype?: string; url_private?: string }>): string[] | undefined {
   const urls = (files ?? [])
     .filter((f): f is { mimetype: string; url_private: string } =>
       !!f.mimetype?.startsWith("image/") && !!f.url_private,

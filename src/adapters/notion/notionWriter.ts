@@ -119,4 +119,36 @@ export class NotionFeedbackWriter implements NotionWriter {
       }))
       .filter((c: { summary: string }) => c.summary); // nothing to compare without a summary
   }
+
+  /**
+   * Backfill-only: overwrite the human-editable Category / Summary on an existing row.
+   * Leaves "AI Suggested Category" untouched so the AI's original call stays diffable.
+   */
+  async updateClassification(
+    pageId: string,
+    patch: { category?: FeedbackCategory; summary?: string },
+  ): Promise<void> {
+    const properties: Record<string, any> = {};
+    if (patch.category) properties["Category"] = { select: { name: patch.category } };
+    if (patch.summary) properties["Summary"] = { rich_text: [{ text: { content: patch.summary.slice(0, MAX_TEXT) } }] };
+    if (Object.keys(properties).length === 0) return;
+    await this.client.pages.update({ page_id: pageId, properties });
+  }
+
+  /**
+   * Backfill-only: record that a human reviewed this row (the Phase A signal). Sets
+   * "Category Reviewed" = true and "Summary Verdict" per whether the summary was faithful.
+   * A human confirming an item during backfill IS that review — this avoids a second pass.
+   */
+  async markReviewed(pageId: string, summaryFaithful: boolean): Promise<void> {
+    await this.client.pages.update({
+      page_id: pageId,
+      properties: {
+        "Category Reviewed": { checkbox: true },
+        "Summary Verdict": {
+          select: { name: summaryFaithful ? "Confirmed Faithful" : "Confirmed Not Faithful" },
+        },
+      },
+    });
+  }
 }

@@ -16,6 +16,10 @@ export interface Config {
   visionEnabledChannelIds: string[];
   /** How far back to look for a possible duplicate when checking for related feedback. */
   similarityWindowDays: number;
+  /** Notion page (shared with the integration) under which the Backfill Review DB is created. */
+  backfillReviewParentPageId?: string;
+  /** Slack user id credited as "Flagged By" on backfilled captures (defaults to bot). */
+  backfillFlaggedByUserId?: string;
 }
 
 function required(name: string): string {
@@ -50,6 +54,8 @@ export function loadConfig(): Config {
       .map((s) => s.trim())
       .filter(Boolean),
     similarityWindowDays: Number(process.env.SIMILARITY_WINDOW_DAYS ?? "30"),
+    backfillReviewParentPageId: optional("BACKFILL_REVIEW_PARENT_PAGE_ID"),
+    backfillFlaggedByUserId: optional("BACKFILL_FLAGGED_BY_USER_ID"),
   };
 
   // Notion creds are only needed when actually writing to Notion.
