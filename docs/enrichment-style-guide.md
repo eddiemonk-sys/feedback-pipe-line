@@ -13,6 +13,9 @@ overlaps, don't let it sprawl. Full rationale: `DISTILLED-RULES-PRD.md`.
 - **P2 — Capture the clarification/resolution.** If the message explains how something actually
   works, or how a confusion was resolved, include it — structure as problem → clarification →
   suggested fix, not just the problem.
+- **P3 — Always include dates, deadlines and timelines.** When a message mentions specific dates or
+  a timeline (e.g. "ready by end of July", "testing Aug–Sep", "'real' use from Oct"), carry them
+  into the summary — don't drop the *when*.
 
 ## Category assignment
 
