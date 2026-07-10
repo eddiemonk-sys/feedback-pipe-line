@@ -1,5 +1,6 @@
 import { Client } from "@notionhq/client";
 import type { NotionWriter, FeedbackRecord, FeedbackCategory } from "../../core/ports.js";
+import { uploadImageToNotion } from "../../backfill/imageUpload.js";
 
 /** Notion caps a single text content value at 2000 characters. */
 const MAX_TEXT = 2000;
@@ -21,11 +22,13 @@ const MAX_RECENT_CANDIDATES = 30;
 export class NotionFeedbackWriter implements NotionWriter {
   private client: Client;
 
-  constructor(apiKey: string, private databaseId: string) {
+  constructor(private apiKey: string, private databaseId: string) {
     this.client = new Client({ auth: apiKey, notionVersion: "2022-06-28" });
   }
 
   async createFeedback(r: FeedbackRecord): Promise<string> {
+    // Best-effort: an image-upload failure must never block the capture (we just attach nothing).
+    const imageUploadId = r.image ? await uploadImageToNotion(this.apiKey, r.image) : null;
     const page = await this.client.pages.create({
       parent: { database_id: this.databaseId },
       properties: {
@@ -58,6 +61,9 @@ export class NotionFeedbackWriter implements NotionWriter {
           : {}),
         ...(r.visualDescription
           ? { "Visual Description": { rich_text: [{ text: { content: r.visualDescription.slice(0, MAX_TEXT) } }] } }
+          : {}),
+        ...(imageUploadId
+          ? { Image: { files: [{ type: "file_upload", file_upload: { id: imageUploadId }, name: "screenshot.png" }] } as any }
           : {}),
         ...(r.relatedFeedbackPageId
           ? { "Related Feedback": { relation: [{ id: r.relatedFeedbackPageId }] } }

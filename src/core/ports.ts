@@ -52,6 +52,7 @@ export interface FeedbackRecord {
   confidence?: ConfidenceLevel; // judge's confidence in the above; absent when judging is disabled or failed
   rationale?: string;      // judge's short rationale; absent when judging is disabled or failed
   visualDescription?: string; // vision's description of an attached screenshot, when present
+  image?: ImageAttachment; // raw screenshot bytes; the Notion writer uploads + attaches it (best-effort)
   relatedFeedbackPageId?: string; // an existing row this one appears to duplicate, when found
   relatedFeedbackRationale?: string; // why the similarity detector linked them
 }

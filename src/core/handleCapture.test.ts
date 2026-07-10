@@ -316,6 +316,48 @@ test("writes feedback without visualDescription when vision returns null", async
   assert.equal(writes[0].visualDescription, undefined);
 });
 
+test("attaches the downloaded screenshot to the feedback record when vision-enabled", async () => {
+  const { deps, writes } = makeDeps();
+  deps.slack.getMessage = async () => ({
+    text: "Getting this error, see screenshot",
+    authorUserId: "Uauthor",
+    imageUrls: ["https://files.slack.com/private/abc123"],
+  });
+  await handleCapture(req, deps);
+  assert.deepEqual(writes[0].image, { data: "ZmFrZS1pbWFnZS1ieXRlcw==", mimeType: "image/png" });
+});
+
+test("leaves the image unset when the channel is not vision-enabled", async () => {
+  const { deps, writes } = makeDeps();
+  deps.visionEnabledChannelIds = new Set(); // C123 (req.channelId) not included
+  deps.slack.getMessage = async () => ({
+    text: "see screenshot",
+    authorUserId: "Uauthor",
+    imageUrls: ["https://files.slack.com/private/abc123"],
+  });
+  await handleCapture(req, deps);
+  assert.equal(writes[0].image, undefined);
+});
+
+test("leaves the image unset when the message has no attachment", async () => {
+  const { deps, writes } = makeDeps();
+  await handleCapture(req, deps); // default getMessage has no imageUrls
+  assert.equal(writes[0].image, undefined);
+});
+
+test("leaves the image unset (but still captures) when the download fails", async () => {
+  const { deps, writes } = makeDeps();
+  deps.slack.getMessage = async () => ({
+    text: "see screenshot",
+    authorUserId: "Uauthor",
+    imageUrls: ["https://files.slack.com/private/abc123"],
+  });
+  deps.slack.downloadImage = async () => { throw new Error("download failed"); };
+  const res = await handleCapture(req, deps);
+  assert.equal(res.status, "captured");
+  assert.equal(writes[0].image, undefined);
+});
+
 test("feeds the vision description into what the enricher and judge see", async () => {
   const { deps, enrichCalls, judgeCalls } = makeDeps();
   deps.slack.getMessage = async () => ({

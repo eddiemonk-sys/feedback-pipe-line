@@ -1,5 +1,5 @@
 import type { CaptureRequest } from "./events.js";
-import type { SlackGateway, NotionWriter, DedupStore, Enricher, Judge, VisionReader, SimilarityDetector } from "./ports.js";
+import type { SlackGateway, NotionWriter, DedupStore, Enricher, Judge, VisionReader, SimilarityDetector, ImageAttachment } from "./ports.js";
 import type { Logger } from "../util/logger.js";
 
 export type CaptureStatus = "captured" | "flagger_added" | "duplicate" | "no_message" | "error";
@@ -107,10 +107,11 @@ export async function handleCapture(
     // AI (correctly) says it can't classify something with no text, even though vision already
     // read the screenshot fine.
     const imageUrl = message.imageUrls?.[0];
-    const visualDescription =
+    const image =
       imageUrl && deps.visionEnabledChannelIds.has(req.channelId)
-        ? await describeImage(deps, imageUrl, channelName, logger)
-        : undefined;
+        ? await fetchImage(deps, imageUrl, logger)
+        : null;
+    const visualDescription = image ? await describeImage(deps, image, channelName, logger) : undefined;
 
     const enrichmentInput = visualDescription
       ? hasRealText
@@ -150,6 +151,7 @@ export async function handleCapture(
       confidence: verdict?.confidence,
       rationale: verdict?.rationale,
       visualDescription,
+      image: image ?? undefined,
       relatedFeedbackPageId: relatedMatch?.matchedPageId,
       relatedFeedbackRationale: relatedMatch?.rationale,
     });
@@ -183,16 +185,28 @@ async function findRelatedFeedback(
   }
 }
 
-/** Downloads and describes the first attached image; fails open (undefined) on any error. */
-async function describeImage(
+/** Downloads the first attached image; fails open (null) on any error. */
+async function fetchImage(
   deps: CaptureDeps,
   imageUrl: string,
+  logger: Logger,
+): Promise<ImageAttachment | null> {
+  try {
+    return await deps.slack.downloadImage(imageUrl);
+  } catch (err) {
+    logger.warn("Image download failed — capturing without the screenshot", { err: String(err) });
+    return null;
+  }
+}
+
+/** Describes an already-downloaded screenshot; fails open (undefined) on any error. */
+async function describeImage(
+  deps: CaptureDeps,
+  image: ImageAttachment,
   channelName: string,
   logger: Logger,
 ): Promise<string | undefined> {
   try {
-    const image = await deps.slack.downloadImage(imageUrl);
-    if (!image) return undefined;
     const result = await deps.vision.describe(image, channelName);
     return result?.description;
   } catch (err) {
