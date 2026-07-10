@@ -1,95 +1,113 @@
 # Feedback Pipeline
 
-Real-time Slack → Notion feedback capture for Spotted Zebra, with AI summarisation,
-categorisation, a self-checking "judge" layer, and screenshot understanding.
+A Slack → Notion **customer-feedback capture and enrichment bot** for Spotted Zebra, with AI
+summarisation, categorisation, a self-checking "judge" layer, screenshot understanding, duplicate
+detection, and a human-curated learning loop.
 
 React **`:mega:`** to any message (or **`@mention`** the bot) in a channel it's invited to, and it
-captures the message into the **"Customer Feedback"** Notion database — enriched with an AI
-summary, a category, a confidence check on that enrichment, and (in the test channel only, for
-now) a description of any attached screenshot. It acks with ✅ (or ⚠️ on failure).
+captures that message into the **"Customer Feedback"** Notion database — enriched with an AI
+summary, a category, a confidence check on that enrichment, a description of any attached
+screenshot, and a link to any earlier feedback it looks like a duplicate of. It acks with ✅
+(or ⚠️ on failure).
+
+> **The program lives here; the data does not.** Feedback rows live in Notion. Secrets live in a
+> local `.env` (git-ignored). This repo is just the code.
 
 Built incrementally, slice by slice, on a ports & adapters architecture so each capability is a
-swappable adapter behind a stable interface — not a rewrite.
+swappable adapter behind a stable interface.
 
-## What it actually does today
+## What it does today
 
 1. **Capture** — `:mega:` reaction or `@mention` (context-aware: a threaded @mention captures the
-   *parent* message; a standalone one captures itself) in any channel the bot is invited to.
+   *parent* message) in any channel the bot is invited to.
 2. **Dedup** — per-message, first-reactor-wins. A second flag adds a co-flagger to the existing row
    instead of creating a duplicate.
-3. **Enrich** — a 1–2 sentence AI summary and one of 10 categories (Bug/Broken, Feature Request,
-   Pricing/Commercial, Onboarding/Setup, UX/Usability, Reporting/Data, Praise, Other, Candidate
-   Experience, Assessment Accuracy/Validity).
-4. **Judge** — a second AI pass checks the summary and category against the *original* message
-   (not against its own preference) and records a `High`/`Medium`/`Low` confidence + a short
-   rationale, so nothing is silently trusted without a spot-check trail. Never silently drops
-   anything — low confidence just gets flagged more visibly, not discarded.
-5. **See** — if a screenshot is attached, Claude vision describes what's shown (error dialogs,
-   broken UI, etc.) and stores that description. **Currently restricted to the test channel only**
-   pending an internal data-handling review — see `ENRICHMENT-DESIGN-DECISIONS.md` before changing
-   `VISION_ENABLED_CHANNEL_IDS`.
-6. **Ack** — ✅/⚠️ reaction, plus a threaded reply for `@mention` captures.
+3. **See** — if a screenshot is attached (in a vision-enabled channel), Claude vision describes it,
+   the description is folded into the summary, and the image file itself is attached to the Notion
+   row.
+4. **Enrich** — a 1–2 sentence AI summary + one of 10 categories (Bug/Broken, Feature Request,
+   Pricing/Commercial, Onboarding/Setup, UX/Usability, Reporting/Data, Praise, Candidate Experience,
+   Assessment Accuracy/Validity, Other).
+5. **Judge** — a second AI pass checks the summary + category against the *original* message and
+   records `High`/`Medium`/`Low` confidence + a short rationale. Nothing is discarded on low
+   confidence — just flagged.
+6. **Link related** — checks recent same-category rows for a likely duplicate and links them, with a
+   rationale.
+7. **Write + ack** — one enriched row into Notion; ✅/⚠️ reaction, plus a threaded reply for
+   `@mention` captures.
 
-## How it's built (and why)
+Every AI/network step is **fail-open**: if vision, enrichment, judging, or the similarity check
+fails, the capture still succeeds with whatever worked. A capture is never lost to a flaky API.
 
-**Ports & adapters.** Everything in `src/core/` depends only on interfaces and consumes a
-normalized `CaptureRequest` — it has **zero knowledge** of how the event arrived, which sink it's
-writing to, or which AI is doing the enrichment/judging/vision. Every capability above is a
-separate port with a real adapter (calls a live service) and a null adapter (safe no-op, used when
-its API key isn't configured). Swapping any one of them is a one-file change; `core/` never moves.
+## Beyond live capture
+
+- **Backfill toolkit** (`scripts/backfillScan.ts` → `backfillCapture.ts`): scan weeks of channel
+  history, stage likely-feedback in a disposable Notion "Backfill Review" DB for a human to tick,
+  then capture the confirmed ones. Uses a high-recall **feedback gate** (`adapters/gate/`) that only
+  runs for backfill, not the live pipeline.
+- **Distilled-rules learning loop**: human review corrections become curated rules the AI follows
+  (see below).
+- **Accuracy report** (`npm run report`): AI-vs-human agreement rates to a Notion page.
+
+## Architecture — ports & adapters (hexagonal)
+
+Everything in `src/core/` depends only on the interfaces in `ports.ts` and consumes a normalized
+`CaptureRequest` — it has **zero knowledge** of how the event arrived, which sink it writes to, or
+which AI does the work. Each capability is a port with a real adapter and a `null` no-op (used when
+its API key isn't configured). Swapping one is a one-file change; `core/` never moves.
 
 ```
 src/
   config.ts                          env loading + validation
-  index.ts                           composition root: builds every adapter, wires the handler, acks
-  core/                              pure business logic — no vendor SDK imports
-    events.ts                       CaptureRequest — the transport-agnostic seam
-    ports.ts                        every interface: SlackGateway, NotionWriter, DedupStore,
-                                     Enricher, Judge, VisionReader
-    taxonomy.ts                     the shared category list (enricher + judge both read this,
-                                     so they can never drift apart)
-    handleCapture.ts                the actual logic: dedup → fetch → enrich → judge → vision → write
-    handleCapture.test.ts           unit tests with fake ports (no live services), TDD throughout
+  index.ts                           composition root: builds adapters, wires the handler, acks
+  core/
+    events.ts                        CaptureRequest — the transport-agnostic seam
+    ports.ts                         every interface (SlackGateway, NotionWriter, Enricher, Judge,
+                                      VisionReader, SimilarityDetector, DedupStore, FeedbackGate…)
+    handleCapture.ts                 the flow: dedup → fetch → vision → enrich → judge → similar → write
+    taxonomy.ts                      the shared category list (enricher + judge read the same source)
+    promptGuidance.ts                injects the distilled-rules guides into system prompts
+    accuracyReport.ts / correctionLog.ts   analysis of human-reviewed rows
+    *.test.ts                        unit tests with fake ports (TDD throughout)
   adapters/
-    transport/socketMode.ts         receives reaction_added / app_mention, normalizes to CaptureRequest
-    slack/boltGateway.ts            SlackGateway — @slack/web-api, incl. authenticated image download
-    notion/notionWriter.ts          NotionWriter — the real Notion API
-    notion/localWriter.ts           NotionWriter — local JSONL file (CAPTURE_SINK=file, for testing)
-    dedup/fileStore.ts              DedupStore — dependency-free JSON file (key → Notion page ID)
-    enricher/claudeEnricher.ts      Enricher — Claude Haiku, structured output
-    enricher/nullEnricher.ts        Enricher — no-op (used when ANTHROPIC_API_KEY unset)
-    judge/claudeJudge.ts            Judge — reference-grounded against the original message
-    judge/nullJudge.ts              Judge — no-op
-    vision/claudeVisionReader.ts    VisionReader — Claude vision, image-then-text ordering
-    vision/nullVisionReader.ts      VisionReader — no-op
-  util/logger.ts
+    slack/         SlackGateway — @slack/bolt + web-api (incl. authenticated image download)
+    notion/        NotionWriter — real Notion API (+ a local JSONL writer for CAPTURE_SINK=file)
+    enricher/      Enricher — Claude Haiku, structured output   (real + null)
+    judge/         Judge — reference-grounded against the original message   (real + null)
+    vision/        VisionReader — Claude vision   (real + null)
+    similarity/    SimilarityDetector — duplicate detection   (real + null)
+    gate/          FeedbackGate — backfill-only "is this feedback?" check   (real + null)
+    dedup/         DedupStore — dependency-free JSON file (key → Notion page ID)
+  backfill/        history scan, review DB, image upload, decisions
+  util/            logger, guide-file loader
+docs/              the human-curated distilled-rules guides (loaded at startup)
+scripts/           operational tools (backfill, correction-log, accuracy report, test-db)
 ```
 
----
+## Setup
 
-## Prerequisites
+Requires **Node ≥ 24**.
 
-### 1. Slack app setup
+```bash
+npm install
+cp .env.example .env      # fill in values — see below
+npm run typecheck
+npm test
+```
 
-1. https://api.slack.com/apps → your app → **Socket Mode** enabled, with an App-Level Token
-   (`connections:write` scope) → this is `SLACK_APP_TOKEN`.
-2. **Bot Token Scopes** (OAuth & Permissions):
-   - `reactions:read`, `reactions:write` — receive/ack `:mega:` reactions
-   - `channels:history`, `channels:read` — read/resolve public channels
-   - `groups:history`, `groups:read` — same, for private channels
-   - `users:read` — resolve display names
-   - `app_mentions:read`, `chat:write` — `@mention` trigger + threaded reply acks
-   - `files:read` — download attached screenshots for vision
-3. **Event Subscriptions** → subscribe to bot events: `reaction_added`, `app_mention`.
-4. **Install/reinstall** the app → copy the Bot User OAuth Token (`xoxb-…`) → this is
-   `SLACK_BOT_TOKEN`.
-5. **Invite the bot** to every channel it should capture from — channel scope is
-   membership-based, there's no allow-list. `/invite @YourBotName`.
+### Slack app
 
-### 2. Notion database schema
+- **Socket Mode** on, with an App-Level Token (`connections:write`) → `SLACK_APP_TOKEN`.
+- **Bot scopes:** `reactions:read`, `reactions:write`, `channels:history`, `channels:read`,
+  `groups:history`, `groups:read`, `users:read`, `app_mentions:read`, `chat:write`, `files:read`.
+- **Event subscriptions:** `reaction_added`, `app_mention`.
+- Bot User OAuth Token (`xoxb-…`) → `SLACK_BOT_TOKEN`. **Invite the bot** to every channel it should
+  capture from — scope is membership-based, no allow-list.
 
-The "Customer Feedback" database needs these properties (create any that don't already exist —
-**do this before running with a new field enabled**, or writes to it will fail):
+### Notion "Customer Feedback" database
+
+Already exists — **do not recreate it.** Share it with your integration (••• → Connections) and use
+the integration secret as `NOTION_API_KEY`. Properties the bot reads/writes:
 
 | Property | Type | Notes |
 |---|---|---|
@@ -97,81 +115,82 @@ The "Customer Feedback" database needs these properties (create any that don't a
 | `Channel`, `Author`, `Flagged By`, `Source` | Text | |
 | `Date` | Date | |
 | `Message URL` | URL | |
-| `Customer/Account` | Text | currently always blank — awaiting CRM linkage |
-| `Status` | Select | `New` / `Reviewed` / `Actioned` — human-owned, the bot never writes to it beyond the initial `New` |
-| `Category` | Select | the 10 values listed above |
-| `Summary` | Text | |
-| `Enrichment Confidence` | Select | `High` / `Medium` / `Low` |
-| `Judge Rationale` | Text | |
-| `Visual Description` | Text | |
+| `Customer/Account` | Text | currently blank — awaiting CRM linkage |
+| `Status` | Select | `New` on write; human-owned thereafter |
+| `Category` / `Summary` | Select / Text | the human-editable classification |
+| `AI Suggested Category` / `AI Suggested Summary` | Select / Text | **frozen** copy of the AI's original call — the yardstick corrections diff against; never hand-edit |
+| `Enrichment Confidence` / `Judge Rationale` | Select / Text | the judge's output |
+| `Visual Description` | Text | vision's description of a screenshot |
+| `Image` | Files & media | the screenshot file itself (see Gotchas) |
+| `Related Feedback` / `Related Count` / `Related Feedback Rationale` | Relation / Rollup / Text | duplicate linking |
+| `Category Reviewed` / `Summary Verdict` / `Related Feedback Verdict` | Checkbox / Select / Select | human-review signals the learning loop reads |
 
-Share the database with your Notion integration (••• menu → Connections → Connect to) and copy
-the internal integration secret → `NOTION_API_KEY`.
+### Environment variables
 
----
+`.env.example` is the canonical, commented list. Essentials: `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`,
+`ANTHROPIC_API_KEY`, `NOTION_API_KEY`, `NOTION_DATABASE_ID`. Optional: `CAPTURE_SINK` (`notion`|`file`),
+`TRIGGER_EMOJI`, `DEDUP_STORE_PATH`, `VISION_ENABLED_CHANNEL_IDS`, `SIMILARITY_WINDOW_DAYS`, the
+`BACKFILL_*` settings, and the distilled-guide paths. **Never commit real secret values** — `.env`
+is git-ignored; configure secrets separately in any new environment.
 
-## Run it
+**Hosting note:** if hosted, `DEDUP_STORE_PATH` must point at storage that survives a
+restart/redeploy — a wiped dedup file means the bot forgets what it captured and can create
+duplicate rows on re-reaction.
 
-```powershell
-copy .env.example .env          # fill in the tokens/keys — see table below
-npm install
-npm run typecheck               # optional — confirms it compiles
-npm test                        # optional — runs the core unit tests
-npm start
+## Running
+
+```bash
+npm run dev     # start with hot-reload (tsx watch)
+npm start       # start once
 ```
 
-You should see startup lines confirming what's enabled:
-```
-Capture sink: notion
-Enrichment enabled (Claude Haiku)
-Judging enabled (category + summary checks)
-Vision enabled for 1 channel(s)
-⚡ Socket Mode connected
-```
+## Operational scripts
 
----
+| Command | What it does |
+|---|---|
+| `npm run correction-log` | Extracts where a human corrected the AI (from Notion) into `enrichment-correction-log.md` / `similarity-correction-log.md` (git-ignored — raw customer text). |
+| `npm run report` | Writes an AI-vs-human agreement-rate summary to a Notion page. Read-only. |
+| `npm run setup:test-db` | Creates a throwaway Notion test database. |
+| `npx tsx scripts/backfillScan.ts` | Scans `BACKFILL_CHANNEL_IDS` over `BACKFILL_WEEKS_BACK` weeks → stages candidates in a disposable "Backfill Review" DB. |
+| `npx tsx scripts/backfillCapture.ts` | Captures the ticked review rows into Customer Feedback (re-enriched, corrections applied, marked reviewed, :mega: added). |
 
-## Configuration (`.env`)
+## The distilled-rules learning loop
 
-| Variable | Required | Default | Notes |
-|---|---|---|---|
-| `SLACK_BOT_TOKEN` | yes | — | `xoxb-…` |
-| `SLACK_APP_TOKEN` | yes | — | `xapp-…` (Socket Mode) |
-| `CAPTURE_SINK` | no | `notion` | `notion` or `file` (writes JSONL locally, no Notion needed) |
-| `NOTION_API_KEY` / `NOTION_DATABASE_ID` | yes if `CAPTURE_SINK=notion` | — | Notion integration secret / DB ID |
-| `TRIGGER_EMOJI` | no | `mega` | Emoji name, no colons |
-| `DEDUP_STORE_PATH` | no | `./data/dedup.json` | Must be on persistent storage if hosted — see note below |
-| `ANTHROPIC_API_KEY` | no | — | Enables enrichment + judge + vision together. Unset = all three are safe no-ops |
-| `VISION_ENABLED_CHANNEL_IDS` | no | *(blank)* | Comma-separated channel IDs. **Fails closed** — blank means vision runs nowhere, even with a key set |
+Corrections are **curated by a human into rules — never auto-injected.**
 
-**Hosting note:** if this ever runs somewhere other than a local machine, `DEDUP_STORE_PATH` must
-point at storage that survives a restart/redeploy. A wiped dedup file means the bot forgets what
-it already captured and can create duplicate Notion rows on re-reaction.
+1. A human reviews rows in Notion (correcting category/summary, flagging bad links).
+2. `npm run correction-log` extracts those corrections into the local log files.
+3. A human distils recurring patterns into `docs/enrichment-style-guide.md` /
+   `docs/similarity-rules.md`.
+4. On startup the enricher + similarity detector load those guides into their prompts (startup logs
+   the loaded rule count). Future calls follow the learned preferences.
 
----
+The frozen `AI Suggested *` fields are the yardstick this loop diffs against — **never hand-edit
+them.**
 
-## Testing the end-to-end flow
+## Status & roadmap
 
-1. React `:mega:` (or `@mention`) to a message in a channel the bot's in → a new Notion row
-   appears within a couple seconds, tagged with a summary, category, and confidence, and the
-   message gets a ✅.
-2. React again on the same message → no duplicate row; the new reactor is added to "Flagged By".
-3. In the test channel only, attach a screenshot to a message and capture it → check "Visual
-   Description" populated on the Notion row.
+Tracked on the Jira DS board as five slices (one epic each):
 
----
+1. **Slice 1 — Slack Capture** *(largely built & live in #client-feedback)*: capture, enrichment,
+   judging, dedup, related-feedback linking, vision, backfill, and the learning loop.
+2. **Slice 2 — Synthesise & Surface**: a weekly themed + frequency digest (Notion → Slack).
+3. **Slice 3 — Broaden Ingestion**: Typeform / Jira CS / Granola sources; reliably telling feedback
+   from ordinary chat (the live "is this feedback?" gate).
+4. **Slice 4 — Tag, Theme & Aggregate Without Noise**: shared taxonomy, cross-source dedup,
+   ARR-weighting.
+5. **Slice 5 — Prioritise & Close the Loop**: status digests, Slack replies to submitters, routing
+   to Jira.
 
-## Current status & what's next
+## Gotchas
 
-- **Live and built:** everything in "What it actually does today" above.
-- **Not built yet:** an "is this even feedback?" gate (deliberately deferred — see
-  `ENRICHMENT-DESIGN-DECISIONS.md` §2), a 4-month Slack-history backfill/triage agent, always-on
-  hosting (the bot currently only runs while its terminal stays open), and storing the actual
-  screenshot file in Notion (currently just a text description — see §"BUILD COMPLETE: vision" in
-  the decisions doc for why).
-- **Read before expanding scope:** `ENRICHMENT-DESIGN-DECISIONS.md` — locked design decisions plus
-  an honest log of what's been explicitly overridden vs. genuinely cleared regarding an ongoing
-  internal data-handling review. Don't assume time passing has resolved anything there.
-- **Related, separate project:** a sibling "Competitor Insights" bot for a different Slack channel
-  — see `competitor-insights-capture-BRIEF.md` (in the parent directory), not part of this repo's
-  scope.
+- **Screenshot attachment needs the `Image` column.** For a captured row to carry its screenshot,
+  the Customer Feedback DB must have an `Image` (Files & media) property. Without it, *image-bearing*
+  captures error and are skipped; text-only captures are unaffected, and the visual *description* is
+  stored either way.
+- **Vision is opt-in per channel** via `VISION_ENABLED_CHANNEL_IDS` (fails closed — blank = nowhere).
+  Sending screenshots to Claude for the real feedback channels was cleared in the 2026-07-06 AI/data
+  review.
+- **`docs/*.md` guides load at startup** — editing them changes AI behaviour on the next restart,
+  not live.
+- **The bot runs only while its process is up** — always-on hosting isn't set up yet.
