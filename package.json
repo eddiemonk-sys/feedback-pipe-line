@@ -14,7 +14,8 @@
     "test": "node --import tsx --test src/core/*.test.ts src/backfill/*.test.ts",
     "setup:test-db": "tsx scripts/createTestDb.ts",
     "report": "tsx scripts/accuracyReport.ts",
-    "correction-log": "tsx scripts/correctionLog.ts"
+    "correction-log": "tsx scripts/correctionLog.ts",
+    "migrate:categories": "tsx scripts/migrateCategoriesToMultiSelect.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.107.0",
