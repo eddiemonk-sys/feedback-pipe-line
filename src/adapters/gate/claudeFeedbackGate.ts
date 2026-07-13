@@ -14,9 +14,11 @@ Bias toward RECALL: a human reviews every message you flag, so when a message pl
 /** High-recall "is this likely customer feedback?" gate. Fails open (returns null) on error. */
 export class ClaudeFeedbackGate implements FeedbackGate {
   private client: Anthropic;
+  private systemPrompt: string;
 
-  constructor(apiKey: string, private model = "claude-haiku-4-5-20251001") {
+  constructor(apiKey: string, systemPrompt?: string, private model = "claude-haiku-4-5-20251001") {
     this.client = new Anthropic({ apiKey });
+    this.systemPrompt = systemPrompt ?? SYSTEM_PROMPT;
   }
 
   async classify(text: string, channelName: string): Promise<FeedbackGateResult | null> {
@@ -24,7 +26,7 @@ export class ClaudeFeedbackGate implements FeedbackGate {
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: 256,
-        system: SYSTEM_PROMPT,
+        system: this.systemPrompt,
         messages: [{ role: "user", content: `Channel: ${channelName}\nMessage: ${text}` }],
         tools: [
           {

@@ -25,9 +25,9 @@ export class ClaudeEnricher implements Enricher {
   private client: Anthropic;
   private systemPrompt: string;
 
-  constructor(apiKey: string, styleGuide?: string, private model = "claude-haiku-4-5-20251001") {
+  constructor(apiKey: string, systemPrompt?: string, styleGuide?: string, private model = "claude-haiku-4-5-20251001") {
     this.client = new Anthropic({ apiKey });
-    this.systemPrompt = appendGuidance(SYSTEM_PROMPT, styleGuide);
+    this.systemPrompt = appendGuidance(systemPrompt ?? SYSTEM_PROMPT, styleGuide);
   }
 
   async enrich(text: string, channelName: string): Promise<EnrichmentResult | null> {

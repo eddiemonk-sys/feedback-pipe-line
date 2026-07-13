@@ -25,9 +25,11 @@ Respond with:
  */
 export class ClaudeJudge implements Judge {
   private client: Anthropic;
+  private systemPrompt: string;
 
-  constructor(apiKey: string, private model = "claude-haiku-4-5-20251001") {
+  constructor(apiKey: string, systemPrompt?: string, private model = "claude-haiku-4-5-20251001") {
     this.client = new Anthropic({ apiKey });
+    this.systemPrompt = systemPrompt ?? SYSTEM_PROMPT;
   }
 
   async review(
@@ -40,7 +42,7 @@ export class ClaudeJudge implements Judge {
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: 256,
-        system: SYSTEM_PROMPT,
+        system: this.systemPrompt,
         messages: [
           {
             role: "user",

@@ -8,6 +8,7 @@ import { ClaudeFeedbackGate } from "../src/adapters/gate/claudeFeedbackGate.js";
 import { NullFeedbackGate } from "../src/adapters/gate/nullFeedbackGate.js";
 import { ClaudeEnricher } from "../src/adapters/enricher/claudeEnricher.js";
 import { loadGuideFile } from "../src/util/loadGuideFile.js";
+import { loadPrompt } from "../src/util/loadPrompt.js";
 import { NullEnricher } from "../src/adapters/enricher/nullEnricher.js";
 import { ClaudeVisionReader } from "../src/adapters/vision/claudeVisionReader.js";
 import { NullVisionReader } from "../src/adapters/vision/nullVisionReader.js";
@@ -29,9 +30,9 @@ async function main() {
 
   const slack = new BoltSlackGateway(config.slackBotToken, logger);
   const botUserId = await slack.getBotUserId();
-  const gate = config.anthropicApiKey ? new ClaudeFeedbackGate(config.anthropicApiKey) : new NullFeedbackGate();
+  const gate = config.anthropicApiKey ? new ClaudeFeedbackGate(config.anthropicApiKey, loadPrompt("gate")) : new NullFeedbackGate();
   const enrichmentStyleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
-  const enricher = config.anthropicApiKey ? new ClaudeEnricher(config.anthropicApiKey, enrichmentStyleGuide) : new NullEnricher();
+  const enricher = config.anthropicApiKey ? new ClaudeEnricher(config.anthropicApiKey, loadPrompt("enricher"), enrichmentStyleGuide) : new NullEnricher();
   const vision = config.anthropicApiKey ? new ClaudeVisionReader(config.anthropicApiKey) : new NullVisionReader();
   const visionChannels = new Set(config.visionEnabledChannelIds);
   const reviewDb = new BackfillReviewDb(notionApiKey);
