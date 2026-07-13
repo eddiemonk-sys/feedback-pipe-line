@@ -180,6 +180,10 @@ async function evalEnricher(config: EvalConfig) {
     const primaryPredicted = result?.categories[0] ?? null;
     const match = primaryPredicted === gold;
     if (match) categoryMatches++;
+    if (!perCat[gold!]) {
+      console.warn(`  ⚠️  Unknown gold category "${gold!}" (pageId: ${row["pageId"]}) — skipping`);
+      continue;
+    }
     perCat[gold!].total++;
     if (match) perCat[gold!].correct++;
 
