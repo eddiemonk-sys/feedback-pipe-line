@@ -74,6 +74,7 @@ async function main() {
       });
 
       aiMigrated++;
+      if (aiMigrated % 20 === 0) console.log(`  Migrated ${aiMigrated} AI rows...`);
       await new Promise((r) => setTimeout(r, 350));
     }
 
