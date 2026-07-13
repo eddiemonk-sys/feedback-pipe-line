@@ -134,6 +134,17 @@ git commit -m "feat(gold-set): export Backfill Review to CSV with enriched_ratio
 - Consumes: `data/gold-set.csv`
 - Produces: `data/gold-set.csv` updated with `enriched_rationale` column; prints list of `pageId`s that need Eddie's annotation (notes too sparse to reason from)
 
+**Gold set encoding — read this before writing the script:**
+
+The structured `corrected_category` and `corrected_summary` columns are nearly empty (0 and 2 entries respectively). The actual corrections and reasoning are almost all in the free-text `correction_notes` field — read and parse **every** `correction_notes` entry; that's where the real signal is.
+
+Column encoding rules:
+- `is_feedback=true` + `classification_ok=true` + `corrected_category` empty → proposed category was CORRECT; `correction_notes` may still contain summary tweaks or nuances.
+- `is_feedback=true` + `classification_ok=false` OR `corrected_category` filled → category needs correction; `correction_notes` explains why.
+- `is_feedback=false` → gate false positive; `correction_notes` explains what made it look like feedback but wasn't.
+
+The distillation agent must read `correction_notes` first and use it as the primary reasoning source. The structured fields are secondary confirmation.
+
 - [ ] **Step 1: Write the distillation script**
 
 ```typescript
@@ -195,32 +206,46 @@ function serializeCSV(headers: string[], rows: Record<string, string>[]): string
 
 const SYSTEM_PROMPT = `You are a reasoning distillation agent for a feedback pipeline.
 
-You will be given a Slack message, whether a human reviewer marked it as customer feedback (is_feedback), and optionally some short reviewer notes. Your job is to write a clear, full principle explaining WHY the reviewer made their decision — one that a future AI can use as a rule.
+You will be given a Slack message and a human reviewer's verdict. Your job is to write a clear, full principle explaining WHY the reviewer made their decision — one that a future AI can use as a rule.
 
-Rules for your rationale:
+## Gold set encoding — understand this first:
+
+The CORRECTION_NOTES field is the primary signal. It contains free-text reasoning, category corrections, summary tweaks, and nuances. The structured corrected_category and corrected_summary fields are nearly empty (most corrections are in the notes). Read correction_notes FIRST.
+
+- is_feedback=true + classification_ok=true + corrected_category empty → proposed category was correct; check correction_notes for any summary nuances.
+- is_feedback=true + corrected_category filled OR classification_ok=false → the category was wrong; correction_notes explains the correct reasoning.
+- is_feedback=false → gate false positive; correction_notes explains what signals made it look like feedback but wasn't.
+
+## Rules for your rationale:
 - Eddie's verdict is FINAL. Articulate the reasoning behind it, never question it.
-- For false positives (is_feedback=false): explain exactly what signals identify this as NOT customer feedback (internal logistics, coordination, social, etc.)
-- For true positives (is_feedback=true): briefly confirm why it IS feedback.
-- 2-4 sentences max. No fluff. Specific to this message.
-- If eddie_notes are provided, incorporate them. Do not invent signals not present in the message.
+- For false positives (is_feedback=false): explain exactly what signals identify this as NOT customer feedback. Be specific to THIS message.
+- For true positives (is_feedback=true): confirm why it IS feedback and what the correct category is.
+- Incorporate everything in correction_notes — that's the authoritative source.
+- 2-4 sentences max. Specific to this message, not generic.
+- Do not invent signals not present in the message or notes.
 
-Return JSON: { "rationale": "...", "needs_annotation": false }
-Set needs_annotation=true only if the notes are so sparse (empty or just "no"/"yes") that you cannot write a useful principle.`;
+Set needs_annotation=true ONLY for feedback rows (is_feedback=true) where correction_notes is completely empty or contains only "yes"/"no" — meaning there is genuinely no reasoning to distill. Non-feedback rows with empty notes are fine (the message itself explains why it's not feedback).`;
 
 async function distillRow(
   client: Anthropic,
   row: Record<string, string>,
 ): Promise<{ rationale: string; needsAnnotation: boolean }> {
+  const isFeedback = row["is_feedback"] === "true";
+  const classificationOk = row["classification_ok"] === "true";
+  const correctionNotes = row["correction_notes"]?.trim() || "";
+
   const prompt = `Message: ${row["message"] || "(none)"}
 is_feedback: ${row["is_feedback"]}
-eddie_notes: ${row["eddie_notes"] || "(none)"}
+classification_ok: ${row["classification_ok"] || "(not set — not applicable for non-feedback rows)"}
 proposed_category: ${row["proposed_category"] || "(none)"}
-corrected_category: ${row["corrected_category"] || "(none)"}`;
+corrected_category: ${row["corrected_category"] || "(empty — see correction_notes or classification_ok)"}
+corrected_summary: ${row["corrected_summary"] || "(empty)"}
+correction_notes: ${correctionNotes || "(empty)"}`;
 
   try {
     const res = await client.messages.create({
       model: MODEL,
-      max_tokens: 256,
+      max_tokens: 384,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: prompt }],
       tools: [
@@ -267,7 +292,9 @@ async function main() {
 
   for (const row of toProcess) {
     const { rationale, needsAnnotation } = await distillRow(client, row);
-    if (needsAnnotation) {
+    // Only flag feedback rows — non-feedback rows with empty notes are fine (message speaks for itself)
+    const shouldFlag = needsAnnotation && row["is_feedback"] === "true";
+    if (shouldFlag) {
       flaggedPageIds.push(row["pageId"]);
       row["enriched_rationale"] = ""; // leave blank — needs Eddie's annotation
     } else {
@@ -278,12 +305,12 @@ async function main() {
   }
 
   writeFileSync(CSV_PATH, serializeCSV(headers, rows));
-  console.log(`\nDone. Enriched_rationale written for ${done - flaggedPageIds.length} rows.`);
+  console.log(`\nDone. enriched_rationale written for ${done - flaggedPageIds.length} rows.`);
 
   if (flaggedPageIds.length > 0) {
-    console.log(`\n⚠️  ${flaggedPageIds.length} rows need Eddie's annotation (notes too sparse):`);
+    console.log(`\n⚠️  ${flaggedPageIds.length} feedback rows need Eddie's annotation (correction_notes too sparse to distill):`);
     for (const id of flaggedPageIds) console.log(`  pageId: ${id}`);
-    console.log("\nFor each flagged pageId, open the Backfill Review DB in Notion and add a brief 'Correction Notes' entry, then re-run this script.");
+    console.log("\nFor each flagged pageId, open the Backfill Review DB in Notion and add a brief Correction Notes entry explaining the category/summary decision, then re-run this script.");
   }
 }
 
@@ -1305,24 +1332,36 @@ Add to `.gitignore` if not present:
 data/eval-results/
 ```
 
+**Gold set encoding — read this before writing the script:**
+
+The structured `corrected_category` column is nearly empty. Use this logic to derive the gold category label for each feedback row:
+- `corrected_category` non-empty → that IS the gold label (explicit correction)
+- `corrected_category` empty + `classification_ok=true` + `is_feedback=true` → `proposed_category` IS the gold label (Eddie affirmed it correct)
+- `corrected_category` empty + `classification_ok` not true → skip this row for enricher eval (ambiguous — no reliable ground truth)
+- `is_feedback=false` → skip for enricher eval (gate false positive, no category ground truth)
+
+The `gate_confidence` column in the CSV is the gate's confidence from the original backfill scan (already computed — no new API calls needed to read it).
+
 - [ ] **Step 2: Write `scripts/runEval.ts`**
 
 ```typescript
 // scripts/runEval.ts
 // Usage:
-//   npx tsx scripts/runEval.ts --adapter gate    (evaluates gate on gold set)
-//   npx tsx scripts/runEval.ts --adapter enricher (evaluates enricher on gold set)
+//   npx tsx scripts/runEval.ts gate      — gate precision/recall/F1 + breakdown by confidence bucket
+//   npx tsx scripts/runEval.ts enricher  — category accuracy overall + per-category table
+//   npx tsx scripts/runEval.ts judge     — judge calibration (runs enricher + judge; expensive)
 import "dotenv/config";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { loadConfig } from "../src/config.js";
 import { ClaudeFeedbackGate } from "../src/adapters/gate/claudeFeedbackGate.js";
 import { ClaudeEnricher } from "../src/adapters/enricher/claudeEnricher.js";
+import { ClaudeJudge } from "../src/adapters/judge/claudeJudge.js";
 import { loadPrompt } from "../src/util/loadPrompt.js";
 import { loadGuideFile } from "../src/util/loadGuideFile.js";
 import { CATEGORIES } from "../src/core/taxonomy.js";
-import type { FeedbackCategory } from "../src/core/ports.js";
+import type { FeedbackCategory, ConfidenceLevel } from "../src/core/ports.js";
 
-// Minimal CSV parser (same as distillation script)
+// Minimal RFC4180 CSV parser (identical to distillation script)
 function parseCSV(text: string): { headers: string[]; rows: Record<string, string>[] } {
   const lines = text.replace(/\r\n?/g, "\n").trim().split("\n");
   if (lines.length === 0) return { headers: [], rows: [] };
@@ -1357,45 +1396,98 @@ function parseCSVLine(line: string): string[] {
   return cells;
 }
 
+function readPromptVersion(key: string): string {
+  try {
+    return readFileSync("./prompts/config.yaml", "utf8").match(new RegExp(`${key}:\\s*(\\S+)`))?.[1] ?? "unknown";
+  } catch { return "unknown"; }
+}
+
+function f1Score(tp: number, fp: number, fn: number): number {
+  const p = tp / (tp + fp) || 0;
+  const r = tp / (tp + fn) || 0;
+  return p + r > 0 ? 2 * p * r / (p + r) : 0;
+}
+
+// ─── Gate Eval ───────────────────────────────────────────────────────────────
+
 async function evalGate(config: ReturnType<typeof loadConfig>) {
   if (!config.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY required.");
   const { rows } = parseCSV(readFileSync("./data/gold-set.csv", "utf8"));
   const gate = new ClaudeFeedbackGate(config.anthropicApiKey, loadPrompt("gate"));
-  const promptVersion = (readFileSync("./prompts/config.yaml", "utf8").match(/gate:\s*(\S+)/)?.[1]) ?? "unknown";
+  const promptVersion = readPromptVersion("gate");
 
   const results: any[] = [];
   let tp = 0, tn = 0, fp = 0, fn = 0;
+
+  // Confidence-bucket tracking — uses the gate's OWN confidence on THIS run (not the backfill's)
+  const buckets: Record<string, { tp: number; tn: number; fp: number; fn: number }> = {
+    High: { tp: 0, tn: 0, fp: 0, fn: 0 },
+    Medium: { tp: 0, tn: 0, fp: 0, fn: 0 },
+    Low: { tp: 0, tn: 0, fp: 0, fn: 0 },
+  };
 
   for (const row of rows) {
     const humanLabel = row["is_feedback"] === "true";
     const result = await gate.classify(row["message"], "eval");
     const predicted = result?.isLikelyFeedback ?? false;
+    const conf = result?.confidence ?? "Low";
 
-    if (humanLabel && predicted) tp++;
-    else if (!humanLabel && !predicted) tn++;
-    else if (!humanLabel && predicted) fp++;
-    else fn++;
+    if (humanLabel && predicted) { tp++; buckets[conf].tp++; }
+    else if (!humanLabel && !predicted) { tn++; buckets[conf].tn++; }
+    else if (!humanLabel && predicted) { fp++; buckets[conf].fp++; }
+    else { fn++; buckets[conf].fn++; }
 
     results.push({
       pageId: row["pageId"],
       humanLabel,
       predicted,
-      confidence: result?.confidence,
+      confidence: conf,
       rationale: result?.rationale,
+      originalGateConfidence: row["gate_confidence"], // from backfill scan — for cross-reference
     });
   }
 
   const precision = tp / (tp + fp) || 0;
   const recall = tp / (tp + fn) || 0;
-  const f1 = precision + recall > 0 ? 2 * precision * recall / (precision + recall) : 0;
-  const summary = { promptVersion, tp, tn, fp, fn, precision, recall, f1, total: rows.length };
+  const overallF1 = f1Score(tp, fp, fn);
+
+  const confidenceBreakdown = Object.fromEntries(
+    Object.entries(buckets).map(([conf, b]) => [
+      conf,
+      {
+        count: b.tp + b.tn + b.fp + b.fn,
+        f1: f1Score(b.tp, b.fp, b.fn),
+        precision: b.tp / (b.tp + b.fp) || 0,
+        recall: b.tp / (b.tp + b.fn) || 0,
+      },
+    ])
+  );
 
   console.log("\n=== Gate Eval ===");
   console.log(`Prompt version: ${promptVersion}`);
-  console.log(`Precision: ${(precision * 100).toFixed(1)}%  Recall: ${(recall * 100).toFixed(1)}%  F1: ${(f1 * 100).toFixed(1)}%`);
-  console.log(`TP=${tp} TN=${tn} FP=${fp} FN=${fn}`);
+  console.log(`Overall  — Precision: ${(precision * 100).toFixed(1)}%  Recall: ${(recall * 100).toFixed(1)}%  F1: ${(overallF1 * 100).toFixed(1)}%  (TP=${tp} TN=${tn} FP=${fp} FN=${fn})`);
+  console.log("\nBy gate confidence (this run):");
+  for (const [conf, b] of Object.entries(confidenceBreakdown)) {
+    console.log(`  ${conf.padEnd(6)} n=${b.count}  F1=${(b.f1 * 100).toFixed(1)}%  Prec=${(b.precision * 100).toFixed(1)}%  Rec=${(b.recall * 100).toFixed(1)}%`);
+  }
 
+  const summary = { promptVersion, tp, tn, fp, fn, precision, recall, f1: overallF1, total: rows.length, confidenceBreakdown };
   return { summary, rows: results };
+}
+
+// ─── Enricher Eval ───────────────────────────────────────────────────────────
+
+/**
+ * Gold label derivation:
+ * - corrected_category non-empty → explicit correction → use it
+ * - corrected_category empty + classification_ok=true → proposed_category was affirmed correct → use it
+ * - else → skip (ambiguous, no reliable ground truth)
+ */
+function goldLabel(row: Record<string, string>): FeedbackCategory | null {
+  if (row["is_feedback"] !== "true") return null;
+  if (row["corrected_category"]) return row["corrected_category"] as FeedbackCategory;
+  if (row["classification_ok"] === "true" && row["proposed_category"]) return row["proposed_category"] as FeedbackCategory;
+  return null;
 }
 
 async function evalEnricher(config: ReturnType<typeof loadConfig>) {
@@ -1403,23 +1495,29 @@ async function evalEnricher(config: ReturnType<typeof loadConfig>) {
   const { rows } = parseCSV(readFileSync("./data/gold-set.csv", "utf8"));
   const styleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
   const enricher = new ClaudeEnricher(config.anthropicApiKey, loadPrompt("enricher"), styleGuide);
-  const promptVersion = (readFileSync("./prompts/config.yaml", "utf8").match(/enricher:\s*(\S+)/)?.[1]) ?? "unknown";
+  const promptVersion = readPromptVersion("enricher");
 
-  // Only evaluate rows that are true feedback (is_feedback=true) and have a corrected_category
-  const evalRows = rows.filter((r) => r["is_feedback"] === "true" && (r["corrected_category"] || r["proposed_category"]));
+  const evalRows = rows.map((r) => ({ row: r, gold: goldLabel(r) })).filter((x) => x.gold !== null);
+  console.log(`\nEnricher eval: ${evalRows.length} rows with reliable gold labels (${rows.length - evalRows.length} skipped — ambiguous or non-feedback)`);
+
   const results: any[] = [];
   let categoryMatches = 0;
 
-  for (const row of evalRows) {
-    const humanCategory = (row["corrected_category"] || row["proposed_category"]) as FeedbackCategory;
+  // Per-category tracking
+  const perCat: Record<string, { correct: number; total: number }> = {};
+  for (const cat of CATEGORIES) perCat[cat] = { correct: 0, total: 0 };
+
+  for (const { row, gold } of evalRows) {
     const result = await enricher.enrich(row["message"], "eval");
-    const primaryPredicted = result?.categories[0];
-    const match = primaryPredicted === humanCategory;
+    const primaryPredicted = result?.categories[0] ?? null;
+    const match = primaryPredicted === gold;
     if (match) categoryMatches++;
+    perCat[gold!].total++;
+    if (match) perCat[gold!].correct++;
 
     results.push({
       pageId: row["pageId"],
-      humanCategory,
+      gold,
       predictedCategories: result?.categories,
       summaryProduced: result?.summary,
       primaryMatch: match,
@@ -1427,19 +1525,97 @@ async function evalEnricher(config: ReturnType<typeof loadConfig>) {
   }
 
   const accuracy = categoryMatches / evalRows.length;
-  const summary = { promptVersion, categoryMatches, total: evalRows.length, primaryCategoryAccuracy: accuracy };
 
   console.log("\n=== Enricher Eval ===");
   console.log(`Prompt version: ${promptVersion}`);
-  console.log(`Primary category accuracy: ${(accuracy * 100).toFixed(1)}% (${categoryMatches}/${evalRows.length})`);
+  console.log(`Overall primary category accuracy: ${(accuracy * 100).toFixed(1)}% (${categoryMatches}/${evalRows.length})`);
+  console.log("\nPer-category accuracy (gold rows only):");
+  const sorted = Object.entries(perCat)
+    .filter(([, v]) => v.total > 0)
+    .sort(([, a], [, b]) => (a.correct / a.total) - (b.correct / b.total));
+  for (const [cat, v] of sorted) {
+    const pct = (v.correct / v.total * 100).toFixed(0);
+    console.log(`  ${String(pct + "%").padStart(4)}  (${v.correct}/${v.total})  ${cat}`);
+  }
 
+  const summary = {
+    promptVersion, categoryMatches, total: evalRows.length, primaryCategoryAccuracy: accuracy,
+    perCategory: Object.fromEntries(Object.entries(perCat).filter(([, v]) => v.total > 0)),
+  };
   return { summary, rows: results };
 }
 
+// ─── Judge Calibration Eval ───────────────────────────────────────────────────
+//
+// Runs enricher + judge on each feedback row. Answers: "When judge says High confidence,
+// is the enricher's primary category actually correct?" If High confidence ≠ high accuracy,
+// the judge is miscalibrated and its confidence routing in W4 (live gate) is unreliable.
+//
+// This is the most expensive eval (2× API calls per row). Run after W3 prompt tuning.
+
+async function evalJudge(config: ReturnType<typeof loadConfig>) {
+  if (!config.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY required.");
+  const { rows } = parseCSV(readFileSync("./data/gold-set.csv", "utf8"));
+  const styleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
+  const enricher = new ClaudeEnricher(config.anthropicApiKey, loadPrompt("enricher"), styleGuide);
+  const judge = new ClaudeJudge(config.anthropicApiKey, loadPrompt("judge"));
+  const enricherVersion = readPromptVersion("enricher");
+  const judgeVersion = readPromptVersion("judge");
+
+  const evalRows = rows.map((r) => ({ row: r, gold: goldLabel(r) })).filter((x) => x.gold !== null);
+  console.log(`\nJudge calibration eval: ${evalRows.length} rows`);
+
+  const results: any[] = [];
+  const buckets: Record<ConfidenceLevel, { correct: number; total: number }> = {
+    High: { correct: 0, total: 0 },
+    Medium: { correct: 0, total: 0 },
+    Low: { correct: 0, total: 0 },
+  };
+
+  for (const { row, gold } of evalRows) {
+    const enrichment = await enricher.enrich(row["message"], "eval");
+    if (!enrichment) {
+      results.push({ pageId: row["pageId"], gold, enrichmentNull: true });
+      continue;
+    }
+    const verdict = await judge.review(row["message"], "eval", enrichment.summary, enrichment.categories);
+    const conf = (verdict?.confidence ?? "Low") as ConfidenceLevel;
+    const match = enrichment.categories[0] === gold;
+
+    buckets[conf].total++;
+    if (match) buckets[conf].correct++;
+
+    results.push({
+      pageId: row["pageId"],
+      gold,
+      predictedCategories: enrichment.categories,
+      primaryMatch: match,
+      judgeConfidence: conf,
+      judgeRationale: verdict?.rationale,
+    });
+  }
+
+  console.log("\n=== Judge Calibration ===");
+  console.log(`Enricher version: ${enricherVersion}  Judge version: ${judgeVersion}`);
+  console.log("Judge confidence → primary category accuracy:");
+  for (const conf of ["High", "Medium", "Low"] as ConfidenceLevel[]) {
+    const b = buckets[conf];
+    if (b.total === 0) { console.log(`  ${conf.padEnd(6)} n=0  (no samples)`); continue; }
+    const acc = (b.correct / b.total * 100).toFixed(1);
+    console.log(`  ${conf.padEnd(6)} n=${b.total}  accuracy=${acc}%  (${b.correct}/${b.total} correct)`);
+  }
+  console.log("Well-calibrated: High > Medium > Low accuracy. If not, judge confidence is not meaningful.");
+
+  const summary = { enricherVersion, judgeVersion, buckets, total: evalRows.length };
+  return { summary, rows: results };
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
 async function main() {
-  const adapterArg = process.argv.find((a) => a === "gate" || a === "enricher");
+  const adapterArg = process.argv.find((a) => a === "gate" || a === "enricher" || a === "judge");
   if (!adapterArg) {
-    console.error("Usage: npx tsx scripts/runEval.ts gate|enricher");
+    console.error("Usage: npx tsx scripts/runEval.ts gate|enricher|judge");
     process.exit(1);
   }
 
@@ -1449,20 +1625,26 @@ async function main() {
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
   mkdirSync("./data/eval-results", { recursive: true });
 
-  const { summary, rows } = adapterArg === "gate" ? await evalGate(config) : await evalEnricher(config);
-  const outPath = `./data/eval-results/${ts}-${adapterArg}-${summary.promptVersion}.json`;
-  writeFileSync(outPath, JSON.stringify({ summary, rows }, null, 2));
+  let result: { summary: any; rows: any[] };
+  if (adapterArg === "gate") result = await evalGate(config);
+  else if (adapterArg === "enricher") result = await evalEnricher(config);
+  else result = await evalJudge(config);
+
+  const version = result.summary.promptVersion ?? result.summary.judgeVersion ?? "unknown";
+  const outPath = `./data/eval-results/${ts}-${adapterArg}-${version}.json`;
+  writeFileSync(outPath, JSON.stringify(result, null, 2));
   console.log(`\nResults saved to ${outPath}`);
 }
 
 main().catch((err) => { console.error("Eval failed:", err); process.exit(1); });
 ```
 
-- [ ] **Step 3: Add eval command to `package.json`**
+- [ ] **Step 3: Add eval commands to `package.json`**
 
 ```json
 "eval:gate": "tsx scripts/runEval.ts gate",
-"eval:enricher": "tsx scripts/runEval.ts enricher"
+"eval:enricher": "tsx scripts/runEval.ts enricher",
+"eval:judge": "tsx scripts/runEval.ts judge"
 ```
 
 - [ ] **Step 4: Run baseline eval for gate**
@@ -1471,7 +1653,7 @@ main().catch((err) => { console.error("Eval failed:", err); process.exit(1); });
 npx tsx scripts/runEval.ts gate
 ```
 
-Expected: console prints precision/recall/F1. Results saved to `data/eval-results/`. Record the baseline F1 number — W2 will improve it.
+Expected: console prints overall precision/recall/F1 + a breakdown table showing F1 per confidence bucket (High/Medium/Low). Results saved to `data/eval-results/`. Record the baseline F1 — W2 will improve it.
 
 - [ ] **Step 5: Run baseline eval for enricher**
 
@@ -1479,13 +1661,17 @@ Expected: console prints precision/recall/F1. Results saved to `data/eval-result
 npx tsx scripts/runEval.ts enricher
 ```
 
-Expected: primary category accuracy printed. Record the baseline accuracy — W3 will improve it.
+Expected: overall primary category accuracy + per-category accuracy table sorted worst-first. Record both numbers — W3 targets the worst-performing categories specifically.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Note which categories are worst (from enricher eval output)**
+
+The per-category table tells W3 exactly where to focus the prompt tuning. If "Other" is the most-confused or "Compliance / Legal / Governance" has zero correct (likely on first run as it's new), W3 must explicitly target those in the v2 prompt.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add scripts/runEval.ts package.json .gitignore
-git commit -m "feat(eval): eval infrastructure + baseline gate + enricher results"
+git commit -m "feat(eval): eval infra — gate F1 by confidence bucket, enricher per-category breakdown, judge calibration"
 ```
 
 ---

@@ -233,19 +233,21 @@ git commit -m "feat(judge): update review() to validate multi-category assignmen
 **Files:**
 - Read: `data/eval-results/` (baseline from W1)
 
-- [ ] **Step 1: Confirm baseline eval result exists**
+- [ ] **Step 1: Read the baseline enricher eval result (produced by W1 Task 10)**
 
 ```bash
-ls data/eval-results/ | grep enricher
+ls -t data/eval-results/ | grep enricher | head -3
 ```
 
-If no baseline exists (W1 eval not yet run), run it now:
+Open the most recent enricher result file and read both fields:
+- `summary.primaryCategoryAccuracy` — the overall baseline to beat
+- `summary.perCategory` — the per-category table. The categories with the lowest accuracy are the ones to target in Task 4's prompt tuning. Do NOT guess; use these numbers.
+
+If no baseline file exists, run it now:
 
 ```bash
 npx tsx scripts/runEval.ts enricher
 ```
-
-Record the baseline primary category accuracy %.
 
 ---
 
