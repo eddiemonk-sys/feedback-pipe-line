@@ -29,39 +29,42 @@ function loadEvalConfig(): EvalConfig {
   };
 }
 
-// Minimal RFC4180 CSV parser (identical to distillation script)
+// RFC4180-compliant CSV parser — handles quoted multi-line fields correctly.
+// Does NOT pre-split on newlines; newlines inside quoted fields are preserved.
 function parseCSV(text: string): { headers: string[]; rows: Record<string, string>[] } {
-  const lines = text.replace(/\r\n?/g, "\n").trim().split("\n");
-  if (lines.length === 0) return { headers: [], rows: [] };
-  const headers = parseCSVLine(lines[0]);
-  const rows = lines.slice(1).map((l) => {
-    const cells = parseCSVLine(l);
-    return Object.fromEntries(headers.map((h, i) => [h, cells[i] ?? ""]));
-  });
+  const allRows = parseCSVRows(text.replace(/\r\n?/g, "\n"));
+  if (allRows.length === 0) return { headers: [], rows: [] };
+  const headers = allRows[0];
+  const rows = allRows.slice(1).map((cells) =>
+    Object.fromEntries(headers.map((h, i) => [h, cells[i] ?? ""]))
+  );
   return { headers, rows };
 }
 
-function parseCSVLine(line: string): string[] {
-  const cells: string[] = [];
+function parseCSVRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
   let i = 0;
-  while (i < line.length) {
-    if (line[i] === '"') {
-      let cell = "";
+  while (i < text.length) {
+    if (text[i] === '"') {
       i++;
-      while (i < line.length) {
-        if (line[i] === '"' && line[i + 1] === '"') { cell += '"'; i += 2; }
-        else if (line[i] === '"') { i++; break; }
-        else { cell += line[i++]; }
+      while (i < text.length) {
+        if (text[i] === '"' && text[i + 1] === '"') { cell += '"'; i += 2; }
+        else if (text[i] === '"') { i++; break; }
+        else { cell += text[i++]; }
       }
-      cells.push(cell);
-      if (line[i] === ",") i++;
+    } else if (text[i] === ',') {
+      row.push(cell); cell = ""; i++;
+    } else if (text[i] === '\n') {
+      row.push(cell); cell = "";
+      rows.push(row); row = []; i++;
     } else {
-      const end = line.indexOf(",", i);
-      cells.push(end === -1 ? line.slice(i) : line.slice(i, end));
-      i = end === -1 ? line.length : end + 1;
+      cell += text[i++];
     }
   }
-  return cells;
+  if (cell || row.length > 0) { row.push(cell); rows.push(row); }
+  return rows;
 }
 
 function readPromptVersion(key: string): string {
