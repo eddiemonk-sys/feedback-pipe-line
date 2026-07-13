@@ -89,7 +89,7 @@ test("lists every category's coverage, including ones with zero captures", () =>
     row({ category: "Feature Request", categoryReviewed: false }),
     row({ category: "Praise", categoryReviewed: true }),
   ]);
-  assert.equal(report.categoryCoverage.length, 10); // every category in the taxonomy, always
+  assert.equal(report.categoryCoverage.length, 11); // every category in the taxonomy, always
   const featureRequest = report.categoryCoverage.find((c) => c.category === "Feature Request");
   const praise = report.categoryCoverage.find((c) => c.category === "Praise");
   const neverSeen = report.categoryCoverage.find((c) => c.category === "Assessment Accuracy/Validity");

@@ -9,7 +9,7 @@
  * Adding a new trigger = produce a CaptureRequest with a new `triggerType` from a new
  * transport adapter. The core never changes.
  */
-export type TriggerType = "mega_reaction" | "mention";
+export type TriggerType = "mega_reaction" | "mention" | "live_gate";
 
 export interface CaptureRequest {
   /** What kind of trigger produced this request. */
@@ -20,4 +20,6 @@ export interface CaptureRequest {
   messageTs: string;
   /** User ID of whoever triggered the capture (the reactor / mentioner). */
   triggeredBy: string;
+  /** Override the initial Notion status. Defaults to "New" when absent. */
+  initialStatus?: "New" | "Needs Review";
 }

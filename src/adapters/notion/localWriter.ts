@@ -38,19 +38,22 @@ export class LocalFeedbackWriter implements NotionWriter {
     this.logger.info("Appended flagger to local file", { pageId, newFlaggerName });
   }
 
-  async findRecentByCategory(
-    category: FeedbackCategory,
+  async findRecentByCategories(
+    categories: FeedbackCategory[],
     sinceDateIso: string,
   ): Promise<Array<{ pageId: string; summary: string }>> {
     if (!existsSync(this.filePath)) return [];
 
     const lines = readFileSync(this.filePath, "utf8").trim().split("\n").filter(Boolean);
     const candidates: Array<{ pageId: string; summary: string }> = [];
+    const categorySet = new Set(categories);
 
     for (const line of lines) {
       try {
         const record = JSON.parse(line);
-        if (record.category !== category || !record.summary) continue;
+        // Support both old single-category and new multi-category records
+        const recordCategories: FeedbackCategory[] = record.categories ?? (record.category ? [record.category] : []);
+        if (!recordCategories.some((c: FeedbackCategory) => categorySet.has(c)) || !record.summary) continue;
         if (record.dateIso && record.dateIso < sinceDateIso) continue;
         if (record.id) candidates.push({ pageId: record.id, summary: record.summary });
       } catch {
