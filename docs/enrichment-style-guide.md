@@ -19,4 +19,13 @@ overlaps, don't let it sprawl. Full rationale: `DISTILLED-RULES-PRD.md`.
 
 ## Category assignment
 
-_(none yet — add a principle here the first time a category call is corrected in review)_
+- **P4 — Compliance / Legal / Governance over Other for legal/regulatory signals.** When a message
+  contains a reference to a legal requirement, GDPR, privacy notice, data retention deadline, ADM
+  (Automated Decision Making), reasonable adjustments, or a regulatory obligation — use
+  Compliance / Legal / Governance, not Other. These arrive as customer requests or CS call notes,
+  not formal complaints; the legal driver is what matters.
+
+- **P5 — Onboarding / Setup for any customer go-live or setup discussion.** When a CS or Sales
+  message is about setting up a customer on a feature, preparing a go-live, running a socialisation
+  call, or working through configuration questions — use Onboarding / Setup, not Other. The scope
+  is broader than initial IT setup: any "getting the customer running with a capability" counts.
