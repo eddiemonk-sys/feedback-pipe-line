@@ -117,7 +117,7 @@ export interface JudgeVerdict {
 /**
  * Reviews an enrichment result against the original message (reference-grounded,
  * not self-comparison) and returns a pointwise confidence + short rationale.
- * Phase 1 scope: checks category-correctness and summary-faithfulness only.
+ * Checks: category fit, multi-category justification (if 2 assigned), and summary faithfulness.
  */
 export interface Judge {
   review(

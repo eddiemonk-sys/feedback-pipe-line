@@ -60,7 +60,7 @@ export class ClaudeJudge implements Judge {
                 confidence: {
                   type: "string",
                   enum: CONFIDENCE_LEVELS,
-                  description: "How much a human should trust this category + summary",
+                  description: "How much a human should trust these categories + summary",
                 },
                 rationale: {
                   type: "string",
