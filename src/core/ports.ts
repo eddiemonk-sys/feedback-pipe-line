@@ -99,7 +99,7 @@ export type FeedbackCategory =
 
 export interface EnrichmentResult {
   summary: string;
-  /** 1–2 categories. Never empty. */
+  /** Currently always 1 category; second slot reserved for W3 prompt tuning. Never empty. */
   categories: FeedbackCategory[];
 }
 
