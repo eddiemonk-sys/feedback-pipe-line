@@ -89,7 +89,7 @@ async function main() {
             authorName,
             dateIso: new Date(Number(c.ts) * 1000).toISOString().slice(0, 10),
             slackUrl,
-            proposedCategory: enrichment?.category,
+            proposedCategory: enrichment?.categories?.[0],
             proposedSummary: enrichment?.summary,
             visualDescription,
             gateConfidence: verdict.confidence,

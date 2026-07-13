@@ -149,15 +149,15 @@ async function evalGate(config: EvalConfig) {
 // ─── Enricher Eval ───────────────────────────────────────────────────────────
 
 /**
- * Gold label derivation:
- * - corrected_category non-empty → explicit correction → use it
+ * Gold label derivation (returns ALL correct categories for multi-category gold):
+ * - corrected_category non-empty → explicit correction (pipe-separated if >1) → use it
  * - corrected_category empty + classification_ok=true → proposed_category was affirmed correct → use it
  * - else → skip (ambiguous, no reliable ground truth)
  */
-function goldLabel(row: Record<string, string>): FeedbackCategory | null {
+function goldLabel(row: Record<string, string>): FeedbackCategory[] | null {
   if (row["is_feedback"] !== "true") return null;
-  if (row["corrected_category"]) return row["corrected_category"] as FeedbackCategory;
-  if (row["classification_ok"] === "true" && row["proposed_category"]) return row["proposed_category"] as FeedbackCategory;
+  if (row["corrected_category"]) return row["corrected_category"].split("|") as FeedbackCategory[];
+  if (row["classification_ok"] === "true" && row["proposed_category"]) return [row["proposed_category"] as FeedbackCategory];
   return null;
 }
 
@@ -181,18 +181,19 @@ async function evalEnricher(config: EvalConfig) {
   for (const { row, gold } of evalRows) {
     const result = await enricher.enrich(row["message"], "eval");
     const primaryPredicted = result?.categories[0] ?? null;
-    const match = primaryPredicted === gold;
-    if (!perCat[gold!]) {
-      console.warn(`  ⚠️  Unknown gold category "${gold!}" (pageId: ${row["pageId"]}) — skipping`);
+    const primaryGold = gold![0];
+    const match = primaryPredicted !== null && gold!.includes(primaryPredicted);
+    if (!perCat[primaryGold]) {
+      console.warn(`  ⚠️  Unknown gold category "${primaryGold}" (pageId: ${row["pageId"]}) — skipping`);
       continue;
     }
     if (match) categoryMatches++;
-    perCat[gold!].total++;
-    if (match) perCat[gold!].correct++;
+    perCat[primaryGold].total++;
+    if (match) perCat[primaryGold].correct++;
 
     results.push({
       pageId: row["pageId"],
-      gold,
+      gold: gold!,
       predictedCategories: result?.categories,
       summaryProduced: result?.summary,
       primaryMatch: match,
@@ -255,14 +256,14 @@ async function evalJudge(config: EvalConfig) {
     }
     const verdict = await judge.review(row["message"], "eval", enrichment.summary, enrichment.categories);
     const conf = (verdict?.confidence ?? "Low") as ConfidenceLevel;
-    const match = enrichment.categories[0] === gold;
+    const match = gold!.some((g) => enrichment.categories.includes(g));
 
     buckets[conf].total++;
     if (match) buckets[conf].correct++;
 
     results.push({
       pageId: row["pageId"],
-      gold,
+      gold: gold!,
       predictedCategories: enrichment.categories,
       primaryMatch: match,
       judgeConfidence: conf,

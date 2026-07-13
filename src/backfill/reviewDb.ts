@@ -74,7 +74,7 @@ export class BackfillReviewDb {
         ...(row.imageUploadId
           ? { Image: { files: [{ type: "file_upload", file_upload: { id: row.imageUploadId }, name: "screenshot.png" }] } as any }
           : {}),
-        ...(row.proposedCategory ? { "Proposed Category": { select: { name: row.proposedCategory } } } : {}),
+        ...(row.proposedCategory ? { "Proposed Category": { multi_select: [{ name: row.proposedCategory }] } } : {}),
         ...(row.proposedSummary ? { "Proposed Summary": rt(row.proposedSummary) } : {}),
         ...(row.visualDescription ? { "Visual Description": rt(row.visualDescription) } : {}),
         ...(row.gateConfidence ? { "Gate Confidence": { select: { name: row.gateConfidence } } } : {}),
@@ -97,7 +97,7 @@ export class BackfillReviewDb {
       });
       for (const page of res.results as any[]) {
         const p = page.properties;
-        const correctedCat = p["Corrected Category"]?.select?.name;
+        const correctedCat = p["Corrected Category"]?.multi_select?.[0]?.name;
         decisions.push({
           channelId: p["Channel ID"]?.rich_text?.[0]?.plain_text ?? "",
           messageTs: p["Message TS"]?.rich_text?.[0]?.plain_text ?? "",
@@ -128,11 +128,11 @@ export class BackfillReviewDb {
           message: txt("Message"),
           gateConfidence: p["Gate Confidence"]?.select?.name ?? null,
           gateRationale: txt("Gate Rationale"),
-          proposedCategory: p["Proposed Category"]?.select?.name ?? null,
+          proposedCategory: p["Proposed Category"]?.multi_select?.[0]?.name ?? null,
           proposedSummary: txt("Proposed Summary"),
           isFeedback: !!p["Is Feedback?"]?.checkbox,
           classificationOk: !!p["Classification OK?"]?.checkbox,
-          correctedCategory: p["Corrected Category"]?.select?.name ?? null,
+          correctedCategory: p["Corrected Category"]?.multi_select?.map((o: any) => o.name).join("|") || null,
           correctedSummary: txt("Corrected Summary"),
           correctionNotes: txt("Correction Notes"),
         });
