@@ -29,7 +29,7 @@ export class ClaudeSimilarityDetector implements SimilarityDetector {
 
   async findSimilar(
     summary: string,
-    category: FeedbackCategory,
+    categories: FeedbackCategory[],
     candidates: Array<{ pageId: string; summary: string }>,
   ): Promise<SimilarMatch | null> {
     if (candidates.length === 0) return null;
@@ -47,7 +47,7 @@ export class ClaudeSimilarityDetector implements SimilarityDetector {
         messages: [
           {
             role: "user",
-            content: `New feedback (category: ${category}): ${summary}\n\nRecent candidates:\n${candidateList}`,
+            content: `New feedback (categories: ${categories.join(", ")}): ${summary}\n\nRecent candidates:\n${candidateList}`,
           },
         ],
         tools: [

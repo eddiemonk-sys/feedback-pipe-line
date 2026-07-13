@@ -34,7 +34,7 @@ export class ClaudeJudge implements Judge {
     originalMessage: string,
     channelName: string,
     summary: string,
-    category: FeedbackCategory,
+    categories: FeedbackCategory[],
   ): Promise<JudgeVerdict | null> {
     try {
       const response = await this.client.messages.create({
@@ -44,7 +44,7 @@ export class ClaudeJudge implements Judge {
         messages: [
           {
             role: "user",
-            content: `Channel: ${channelName}\nOriginal message: ${originalMessage}\n\nProposed summary: ${summary}\nProposed category: ${category}`,
+            content: `Channel: ${channelName}\nOriginal message: ${originalMessage}\n\nProposed summary: ${summary}\nProposed categories: ${categories.join(", ")}`,
           },
         ],
         tools: [

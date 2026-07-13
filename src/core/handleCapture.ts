@@ -154,6 +154,7 @@ export async function handleCapture(
       image: image ?? undefined,
       relatedFeedbackPageId: relatedMatch?.matchedPageId,
       relatedFeedbackRationale: relatedMatch?.rationale,
+      status: req.initialStatus,
     });
 
     dedup.record(key, pageId);

@@ -74,7 +74,7 @@ export class ClaudeEnricher implements Enricher {
 
       return {
         summary: input.summary,
-        category: input.category as FeedbackCategory,
+        categories: [input.category as FeedbackCategory],
       };
     } catch {
       return null;
