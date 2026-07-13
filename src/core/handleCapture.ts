@@ -146,7 +146,7 @@ export async function handleCapture(
       customerAccount: "",
       summary: enrichment?.summary,
       categories: enrichment?.categories,
-      aiSuggestedCategories: enrichment?.categories,
+      aiSuggestedCategories: enrichment?.categories ? [...enrichment.categories] : undefined,
       aiSuggestedSummary: enrichment?.summary,
       confidence: verdict?.confidence,
       rationale: verdict?.rationale,
