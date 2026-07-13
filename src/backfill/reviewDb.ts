@@ -43,7 +43,7 @@ export class BackfillReviewDb {
         Date: { date: {} },
         "Slack Link": { url: {} },
         Image: { files: {} },
-        "Proposed Category": { select: { options: CATEGORY_OPTIONS } },
+        "Proposed Category": { multi_select: { options: CATEGORY_OPTIONS } },
         "Proposed Summary": { rich_text: {} },
         "Visual Description": { rich_text: {} },
         "Gate Confidence": { select: { options: CONFIDENCE_OPTIONS } },
@@ -51,7 +51,7 @@ export class BackfillReviewDb {
         // --- human inputs ---
         "Is Feedback?": { checkbox: {} },
         "Classification OK?": { checkbox: {} },
-        "Corrected Category": { select: { options: CATEGORY_OPTIONS } },
+        "Corrected Category": { multi_select: { options: CATEGORY_OPTIONS } },
         "Corrected Summary": { rich_text: {} },
         "Correction Notes": { rich_text: {} },
         // --- machine fields (needed to rebuild the CaptureRequest) ---
