@@ -126,14 +126,14 @@ export async function handleCapture(
 
     const verdict = enrichment
       ? await deps.judge
-          .review(enrichmentInput, channelName, enrichment.summary, enrichment.category)
+          .review(enrichmentInput, channelName, enrichment.summary, enrichment.categories)
           .catch((err) => {
             logger.warn("Judging failed — capturing without confidence/rationale", { err: String(err) });
             return null;
           })
       : null;
 
-    const relatedMatch = enrichment ? await findRelatedFeedback(deps, enrichment.summary, enrichment.category, logger) : null;
+    const relatedMatch = enrichment ? await findRelatedFeedback(deps, enrichment.summary, enrichment.categories, logger) : null;
 
     const pageId = await notion.createFeedback({
       message: text,
@@ -145,8 +145,8 @@ export async function handleCapture(
       messageUrl,
       customerAccount: "",
       summary: enrichment?.summary,
-      category: enrichment?.category,
-      aiSuggestedCategory: enrichment?.category,
+      categories: enrichment?.categories,
+      aiSuggestedCategories: enrichment?.categories ? [...enrichment.categories] : undefined,
       aiSuggestedSummary: enrichment?.summary,
       confidence: verdict?.confidence,
       rationale: verdict?.rationale,
@@ -154,6 +154,7 @@ export async function handleCapture(
       image: image ?? undefined,
       relatedFeedbackPageId: relatedMatch?.matchedPageId,
       relatedFeedbackRationale: relatedMatch?.rationale,
+      status: req.initialStatus,
     });
 
     dedup.record(key, pageId);
@@ -169,16 +170,16 @@ export async function handleCapture(
 async function findRelatedFeedback(
   deps: CaptureDeps,
   summary: string,
-  category: import("./ports.js").FeedbackCategory,
+  categories: import("./ports.js").FeedbackCategory[],
   logger: Logger,
 ): Promise<import("./ports.js").SimilarMatch | null> {
   try {
     const sinceDateIso = new Date(Date.now() - deps.similarityWindowDays * 86_400_000)
       .toISOString()
       .slice(0, 10);
-    const candidates = await deps.notion.findRecentByCategory(category, sinceDateIso);
+    const candidates = await deps.notion.findRecentByCategories(categories, sinceDateIso);
     if (candidates.length === 0) return null;
-    return await deps.similarityDetector.findSimilar(summary, category, candidates);
+    return await deps.similarityDetector.findSimilar(summary, categories, candidates);
   } catch (err) {
     logger.warn("Similarity check failed — capturing without a related-feedback link", { err: String(err) });
     return null;

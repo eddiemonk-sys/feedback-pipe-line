@@ -61,8 +61,8 @@ async function fetchRows(): Promise<CorrectionRow[]> {
     return {
       pageId: p.id,
       message: title(props["Message"]),
-      category: selectName(props["Category"]) as FeedbackCategory | null,
-      aiSuggestedCategory: selectName(props["AI Suggested Category"]) as FeedbackCategory | null,
+      categories: (props["Categories"]?.multi_select ?? []).map((o: any) => o.name as FeedbackCategory),
+      aiSuggestedCategories: (props["AI Suggested Categories"]?.multi_select ?? []).map((o: any) => o.name as FeedbackCategory),
       categoryReviewed: !!props["Category Reviewed"]?.checkbox,
       summary: text(props["Summary"]),
       aiSuggestedSummary: text(props["AI Suggested Summary"]),

@@ -15,4 +15,5 @@ export const CATEGORIES: FeedbackCategory[] = [
   "Other",
   "Candidate Experience",
   "Assessment Accuracy/Validity",
+  "Compliance / Legal / Governance",
 ];

@@ -7,8 +7,8 @@ export type RelatedVerdict = "Confirmed Correct" | "Confirmed Incorrect" | null;
 export interface CorrectionRow {
   pageId: string;
   message: string;
-  category: FeedbackCategory | null;
-  aiSuggestedCategory: FeedbackCategory | null;
+  categories: FeedbackCategory[] | null;
+  aiSuggestedCategories: FeedbackCategory[] | null;
   categoryReviewed: boolean;
   summary: string | null;
   aiSuggestedSummary: string | null;
@@ -41,27 +41,30 @@ export interface EnricherCorrection {
 export function detectEnricherCorrections(rows: CorrectionRow[]): EnricherCorrection[] {
   const out: EnricherCorrection[] = [];
   for (const r of rows) {
-    if (r.categoryReviewed && r.aiSuggestedCategory && r.category && r.category !== r.aiSuggestedCategory) {
+    // Category correction: primary category changed
+    const primaryHuman = r.categories?.[0];
+    const primaryAI = r.aiSuggestedCategories?.[0];
+    if (r.categoryReviewed && primaryAI && primaryHuman && primaryHuman !== primaryAI) {
       out.push({
         pageId: r.pageId,
         kind: "category",
-        category: r.category,
+        category: primaryHuman,
         message: r.message,
-        before: r.aiSuggestedCategory,
-        after: r.category,
+        before: primaryAI,
+        after: primaryHuman,
       });
     }
     if (
       r.summaryVerdict === "Confirmed Not Faithful" &&
       r.aiSuggestedSummary &&
       r.summary &&
-      r.category &&
+      primaryHuman &&
       r.summary.trim() !== r.aiSuggestedSummary.trim() // a Not-Faithful flag with no actual edit isn't a correction
     ) {
       out.push({
         pageId: r.pageId,
         kind: "summary",
-        category: r.category,
+        category: primaryHuman,
         message: r.message,
         before: r.aiSuggestedSummary,
         after: r.summary,
@@ -89,10 +92,11 @@ export interface SimilarityCorrection {
 export function detectSimilarityCorrections(rows: CorrectionRow[]): SimilarityCorrection[] {
   const out: SimilarityCorrection[] = [];
   for (const r of rows) {
-    if (r.relatedVerdict === "Confirmed Incorrect" && r.summary && r.category) {
+    const primaryHuman = r.categories?.[0];
+    if (r.relatedVerdict === "Confirmed Incorrect" && r.summary && primaryHuman) {
       out.push({
         pageId: r.pageId,
-        category: r.category,
+        category: primaryHuman,
         newSummary: r.summary,
         matchedSummary: r.relatedMatchedSummary ?? "(linked row's summary unavailable)",
         rationale: r.relatedRationale ?? "(no rationale recorded)",

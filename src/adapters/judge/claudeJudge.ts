@@ -25,26 +25,28 @@ Respond with:
  */
 export class ClaudeJudge implements Judge {
   private client: Anthropic;
+  private systemPrompt: string;
 
-  constructor(apiKey: string, private model = "claude-haiku-4-5-20251001") {
+  constructor(apiKey: string, systemPrompt?: string, private model = "claude-haiku-4-5-20251001") {
     this.client = new Anthropic({ apiKey });
+    this.systemPrompt = systemPrompt ?? SYSTEM_PROMPT;
   }
 
   async review(
     originalMessage: string,
     channelName: string,
     summary: string,
-    category: FeedbackCategory,
+    categories: FeedbackCategory[],
   ): Promise<JudgeVerdict | null> {
     try {
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: 256,
-        system: SYSTEM_PROMPT,
+        system: this.systemPrompt,
         messages: [
           {
             role: "user",
-            content: `Channel: ${channelName}\nOriginal message: ${originalMessage}\n\nProposed summary: ${summary}\nProposed category: ${category}`,
+            content: `Channel: ${channelName}\nOriginal message: ${originalMessage}\n\nProposed summary: ${summary}\nProposed categories: ${categories.join(", ")}`,
           },
         ],
         tools: [

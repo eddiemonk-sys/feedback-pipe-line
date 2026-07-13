@@ -122,6 +122,7 @@ export class BackfillReviewDb {
         const p = page.properties;
         const txt = (k: string) => p[k]?.rich_text?.[0]?.plain_text ?? p[k]?.title?.[0]?.plain_text ?? "";
         rows.push({
+          pageId: page.id,
           channelId: txt("Channel ID"),
           messageTs: txt("Message TS"),
           message: txt("Message"),

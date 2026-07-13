@@ -37,7 +37,7 @@ export class NotionFeedbackWriter implements NotionWriter {
         Author: { rich_text: [{ text: { content: r.authorName.slice(0, MAX_TEXT) } }] },
         Date: { date: { start: r.dateIso } },
         "Flagged By": { rich_text: [{ text: { content: r.flaggedByName.slice(0, MAX_TEXT) } }] },
-        Status: { select: { name: "New" } },
+        Status: { select: { name: r.status ?? "New" } },
         Source: { rich_text: [{ text: { content: r.source.slice(0, MAX_TEXT) } }] },
         "Message URL": { url: r.messageUrl || null },
         "Customer/Account": {
@@ -48,9 +48,18 @@ export class NotionFeedbackWriter implements NotionWriter {
         ...(r.summary
           ? { Summary: { rich_text: [{ text: { content: r.summary.slice(0, MAX_TEXT) } }] } }
           : {}),
-        ...(r.category ? { Category: { select: { name: r.category } } } : {}),
-        ...(r.aiSuggestedCategory
-          ? { "AI Suggested Category": { select: { name: r.aiSuggestedCategory } } }
+        ...(r.categories && r.categories.length > 0
+          ? { Categories: { multi_select: r.categories.map((name) => ({ name })) } }
+          : {}),
+        ...(r.aiSuggestedCategories && r.aiSuggestedCategories.length > 0
+          ? { "AI Suggested Categories": { multi_select: r.aiSuggestedCategories.map((name) => ({ name })) } }
+          : {}),
+        // Migration shim — remove after migration script has run
+        ...(r.categories && r.categories.length > 0
+          ? { Category: { select: { name: r.categories[0] } } }
+          : {}),
+        ...(r.aiSuggestedCategories && r.aiSuggestedCategories.length > 0
+          ? { "AI Suggested Category": { select: { name: r.aiSuggestedCategories[0] } } }
           : {}),
         ...(r.aiSuggestedSummary
           ? { "AI Suggested Summary": { rich_text: [{ text: { content: r.aiSuggestedSummary.slice(0, MAX_TEXT) } }] } }
@@ -103,17 +112,26 @@ export class NotionFeedbackWriter implements NotionWriter {
     });
   }
 
-  async findRecentByCategory(
-    category: FeedbackCategory,
+  async findRecentByCategories(
+    categories: FeedbackCategory[],
     sinceDateIso: string,
   ): Promise<Array<{ pageId: string; summary: string }>> {
+    if (categories.length === 0) return [];
+
+    const filter =
+      categories.length === 1
+        ? { property: "Categories", multi_select: { contains: categories[0] } }
+        : {
+            or: categories.map((cat) => ({
+              property: "Categories",
+              multi_select: { contains: cat },
+            })),
+          };
+
     const res: any = await this.client.databases.query({
       database_id: this.databaseId,
       filter: {
-        and: [
-          { property: "Category", select: { equals: category } },
-          { property: "Date", date: { on_or_after: sinceDateIso } },
-        ],
+        and: [filter, { property: "Date", date: { on_or_after: sinceDateIso } }],
       },
       page_size: MAX_RECENT_CANDIDATES,
     });
@@ -123,7 +141,7 @@ export class NotionFeedbackWriter implements NotionWriter {
         pageId: page.id as string,
         summary: (page.properties?.["Summary"]?.rich_text?.[0]?.plain_text as string) ?? "",
       }))
-      .filter((c: { summary: string }) => c.summary); // nothing to compare without a summary
+      .filter((c: { summary: string }) => c.summary);
   }
 
   /**

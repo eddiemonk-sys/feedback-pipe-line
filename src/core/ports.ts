@@ -45,16 +45,20 @@ export interface FeedbackRecord {
   source: string;
   messageUrl: string;
   customerAccount: string;
-  summary?: string;        // AI-generated; absent when enrichment is disabled or failed
-  category?: FeedbackCategory; // AI-assigned; absent when enrichment is disabled or failed
-  aiSuggestedCategory?: FeedbackCategory; // frozen copy of `category` at write time — never edited after, so a later human correction to `category` stays diffable against what the AI originally said
-  aiSuggestedSummary?: string; // frozen copy of `summary` at write time — same reason as aiSuggestedCategory: correcting `summary` in place would otherwise destroy the AI's original wording
-  confidence?: ConfidenceLevel; // judge's confidence in the above; absent when judging is disabled or failed
-  rationale?: string;      // judge's short rationale; absent when judging is disabled or failed
-  visualDescription?: string; // vision's description of an attached screenshot, when present
-  image?: ImageAttachment; // raw screenshot bytes; the Notion writer uploads + attaches it (best-effort)
-  relatedFeedbackPageId?: string; // an existing row this one appears to duplicate, when found
-  relatedFeedbackRationale?: string; // why the similarity detector linked them
+  summary?: string;
+  /** AI-assigned categories (1–2 items). Absent when enrichment disabled or failed. */
+  categories?: FeedbackCategory[];
+  /** Frozen AI copy — never edited after initial write. */
+  aiSuggestedCategories?: FeedbackCategory[];
+  aiSuggestedSummary?: string;
+  confidence?: ConfidenceLevel;
+  rationale?: string;
+  visualDescription?: string;
+  image?: ImageAttachment;
+  relatedFeedbackPageId?: string;
+  relatedFeedbackRationale?: string;
+  /** Initial Notion Status. Defaults to "New". Live gate sets "Needs Review" for medium/low confidence. */
+  status?: "New" | "Needs Review";
 }
 
 export interface NotionWriter {
@@ -62,8 +66,8 @@ export interface NotionWriter {
   createFeedback(record: FeedbackRecord): Promise<string>;
   /** Append a new flagger name to the "Flagged By" field of an existing row. */
   appendFlagger(pageId: string, newFlaggerName: string): Promise<void>;
-  /** Recent rows in the same category, for similarity comparison. */
-  findRecentByCategory(category: FeedbackCategory, sinceDateIso: string): Promise<Array<{ pageId: string; summary: string }>>;
+  /** Recent rows in any of the given categories, for similarity comparison. */
+  findRecentByCategories(categories: FeedbackCategory[], sinceDateIso: string): Promise<Array<{ pageId: string; summary: string }>>;
 }
 
 /** Dedup store keyed on a stable message key (channelId:messageTs). */
@@ -73,6 +77,10 @@ export interface DedupStore {
   record(key: string, pageId: string): void;
   /** Return the stored page ID, or null for keys recorded before this field existed. */
   getPageId(key: string): string | null;
+  /** Remove a key from the store (used when a "Not Feedback" verdict deletes a row). */
+  delete(key: string): void;
+  /** Find the dedup key associated with a Notion page ID. Returns null if not found. */
+  findKeyByPageId(pageId: string): string | null;
   close(): void;
 }
 
@@ -86,11 +94,13 @@ export type FeedbackCategory =
   | "Praise"
   | "Other"
   | "Candidate Experience"
-  | "Assessment Accuracy/Validity";
+  | "Assessment Accuracy/Validity"
+  | "Compliance / Legal / Governance";
 
 export interface EnrichmentResult {
   summary: string;
-  category: FeedbackCategory;
+  /** Currently always 1 category; second slot reserved for W3 prompt tuning. Never empty. */
+  categories: FeedbackCategory[];
 }
 
 export interface Enricher {
@@ -114,7 +124,7 @@ export interface Judge {
     originalMessage: string,
     channelName: string,
     summary: string,
-    category: FeedbackCategory,
+    categories: FeedbackCategory[],
   ): Promise<JudgeVerdict | null>;
 }
 
@@ -149,7 +159,7 @@ export interface FeedbackGateResult {
 export interface SimilarityDetector {
   findSimilar(
     summary: string,
-    category: FeedbackCategory,
+    categories: FeedbackCategory[],
     candidates: Array<{ pageId: string; summary: string }>,
   ): Promise<SimilarMatch | null>;
 }

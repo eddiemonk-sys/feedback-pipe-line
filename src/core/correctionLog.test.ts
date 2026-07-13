@@ -14,8 +14,8 @@ function row(over: Partial<CorrectionRow> = {}): CorrectionRow {
   return {
     pageId: "p1",
     message: "some feedback",
-    category: "Bug / Broken",
-    aiSuggestedCategory: "Bug / Broken",
+    categories: ["Bug / Broken"],
+    aiSuggestedCategories: ["Bug / Broken"],
     categoryReviewed: false,
     summary: "a summary",
     aiSuggestedSummary: "a summary",
@@ -32,8 +32,8 @@ test("flags a category correction when a reviewed row's category differs from th
     row({
       pageId: "p1",
       categoryReviewed: true,
-      aiSuggestedCategory: "Feature Request",
-      category: "Bug / Broken",
+      aiSuggestedCategories: ["Feature Request"],
+      categories: ["Bug / Broken"],
       message: "export is broken",
     }),
   ]);
@@ -47,21 +47,21 @@ test("flags a category correction when a reviewed row's category differs from th
 
 test("does not flag a category correction when the reviewed category matches the AI", () => {
   const out = detectEnricherCorrections([
-    row({ categoryReviewed: true, aiSuggestedCategory: "Praise", category: "Praise" }),
+    row({ categoryReviewed: true, aiSuggestedCategories: ["Praise"], categories: ["Praise"] }),
   ]);
   assert.equal(out.filter((c) => c.kind === "category").length, 0);
 });
 
 test("ignores a category difference on a row that has not been reviewed", () => {
   const out = detectEnricherCorrections([
-    row({ categoryReviewed: false, aiSuggestedCategory: "Feature Request", category: "Bug / Broken" }),
+    row({ categoryReviewed: false, aiSuggestedCategories: ["Feature Request"], categories: ["Bug / Broken"] }),
   ]);
   assert.equal(out.filter((c) => c.kind === "category").length, 0);
 });
 
 test("skips a category correction when the AI's original category is missing (nothing to diff)", () => {
   const out = detectEnricherCorrections([
-    row({ categoryReviewed: true, aiSuggestedCategory: null, category: "Bug / Broken" }),
+    row({ categoryReviewed: true, aiSuggestedCategories: [], categories: ["Bug / Broken"] }),
   ]);
   assert.equal(out.filter((c) => c.kind === "category").length, 0);
 });
@@ -73,7 +73,7 @@ test("flags a summary correction when the verdict is Not Faithful, with a before
       summaryVerdict: "Confirmed Not Faithful",
       aiSuggestedSummary: "User reports export issues",
       summary: "Export button is broken; also wants a date-range filter",
-      category: "Bug / Broken",
+      categories: ["Bug / Broken"],
     }),
   ]);
   const summ = out.filter((c) => c.kind === "summary");
@@ -95,7 +95,7 @@ test("skips a summary 'correction' when the text is unchanged (Not-Faithful flag
       summaryVerdict: "Confirmed Not Faithful",
       aiSuggestedSummary: "User wants X.",
       summary: "  User wants X.  ",
-      category: "Feature Request",
+      categories: ["Feature Request"],
     }),
   ]);
   assert.equal(out.filter((c) => c.kind === "summary").length, 0);
@@ -105,8 +105,8 @@ test("a single row can yield both a category and a summary correction", () => {
   const out = detectEnricherCorrections([
     row({
       categoryReviewed: true,
-      aiSuggestedCategory: "Other",
-      category: "Bug / Broken",
+      aiSuggestedCategories: ["Other"],
+      categories: ["Bug / Broken"],
       summaryVerdict: "Confirmed Not Faithful",
       aiSuggestedSummary: "vague",
       summary: "specific",
@@ -122,7 +122,7 @@ test("flags a similarity correction when the related-feedback verdict is Confirm
     row({
       pageId: "p9",
       relatedVerdict: "Confirmed Incorrect",
-      category: "UX / Usability",
+      categories: ["UX / Usability"],
       summary: "search is slow today",
       relatedMatchedSummary: "the search bar freezes when typing fast",
       relatedRationale: "both mention search performance",
@@ -148,7 +148,7 @@ test("falls back gracefully when the wrong link's summary/rationale weren't reco
     row({
       relatedVerdict: "Confirmed Incorrect",
       summary: "s",
-      category: "Other",
+      categories: ["Other"],
       relatedMatchedSummary: null,
       relatedRationale: null,
     }),

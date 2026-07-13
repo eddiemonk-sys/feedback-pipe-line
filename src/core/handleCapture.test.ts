@@ -17,12 +17,12 @@ function makeDeps() {
   const writes: FeedbackRecord[] = [];
   const appendedFlaggers: Array<{ pageId: string; name: string }> = [];
   const store = new Map<string, string>(); // key → pageId
-  const judgeCalls: Array<{ originalMessage: string; channelName: string; summary: string; category: FeedbackCategory }> = [];
+  const judgeCalls: Array<{ originalMessage: string; channelName: string; summary: string; categories: FeedbackCategory[] }> = [];
   const downloadCalls: string[] = [];
   const visionCalls: Array<{ data: string; mimeType: string; channelName: string }> = [];
   const enrichCalls: string[] = [];
-  const recentByCategoryCalls: Array<{ category: FeedbackCategory; sinceDateIso: string }> = [];
-  const similarityCalls: Array<{ summary: string; category: FeedbackCategory; candidates: Array<{ pageId: string; summary: string }> }> = [];
+  const recentByCategoryCalls: Array<{ categories: FeedbackCategory[]; sinceDateIso: string }> = [];
+  const similarityCalls: Array<{ summary: string; categories: FeedbackCategory[]; candidates: Array<{ pageId: string; summary: string }> }> = [];
   let recentCandidates: Array<{ pageId: string; summary: string }> = [];
 
   const deps: CaptureDeps = {
@@ -32,6 +32,11 @@ function makeDeps() {
       has: (k) => store.has(k),
       record: (k, pageId) => { store.set(k, pageId); },
       getPageId: (k) => store.get(k) ?? null,
+      delete: (k) => { store.delete(k); },
+      findKeyByPageId: (pageId) => {
+        for (const [k, v] of store) { if (v === pageId) return k; }
+        return null;
+      },
       close: () => {},
     },
     notion: {
@@ -42,8 +47,8 @@ function makeDeps() {
       appendFlagger: async (pageId, name) => {
         appendedFlaggers.push({ pageId, name });
       },
-      findRecentByCategory: async (category, sinceDateIso) => {
-        recentByCategoryCalls.push({ category, sinceDateIso });
+      findRecentByCategories: async (categories, sinceDateIso) => {
+        recentByCategoryCalls.push({ categories, sinceDateIso });
         return recentCandidates;
       },
     },
@@ -64,13 +69,13 @@ function makeDeps() {
         enrichCalls.push(text);
         return {
           summary: "Customer wants SSO integration.",
-          category: "Feature Request" as FeedbackCategory,
+          categories: ["Feature Request" as FeedbackCategory],
         };
       },
     },
     judge: {
-      review: async (originalMessage, channelName, summary, category) => {
-        judgeCalls.push({ originalMessage, channelName, summary, category });
+      review: async (originalMessage, channelName, summary, categories) => {
+        judgeCalls.push({ originalMessage, channelName, summary, categories });
         return { confidence: "High", rationale: "Category and summary both match the source message." };
       },
     },
@@ -82,8 +87,8 @@ function makeDeps() {
     },
     visionEnabledChannelIds: new Set(["C123"]),
     similarityDetector: {
-      findSimilar: async (summary, category, candidates) => {
-        similarityCalls.push({ summary, category, candidates });
+      findSimilar: async (summary, categories, candidates) => {
+        similarityCalls.push({ summary, categories, candidates });
         return null;
       },
     },
@@ -166,25 +171,25 @@ test("returns no_message when the message can't be fetched", async () => {
   assert.equal(writes.length, 0);
 });
 
-test("includes enriched summary and category in the feedback record", async () => {
+test("includes enriched summary and categories in the feedback record", async () => {
   const { deps, writes } = makeDeps();
   await handleCapture(req, deps);
   assert.equal(writes[0].summary, "Customer wants SSO integration.");
-  assert.equal(writes[0].category, "Feature Request");
+  assert.deepEqual(writes[0].categories, ["Feature Request"]);
 });
 
-test("freezes a copy of the category into aiSuggestedCategory at write time", async () => {
+test("freezes a copy of the categories into aiSuggestedCategories at write time", async () => {
   const { deps, writes } = makeDeps();
   await handleCapture(req, deps);
-  assert.equal(writes[0].aiSuggestedCategory, "Feature Request");
-  assert.equal(writes[0].aiSuggestedCategory, writes[0].category);
+  assert.deepEqual(writes[0].aiSuggestedCategories, ["Feature Request"]);
+  assert.deepEqual(writes[0].aiSuggestedCategories, writes[0].categories);
 });
 
-test("leaves aiSuggestedCategory undefined when enrichment is disabled or failed", async () => {
+test("leaves aiSuggestedCategories undefined when enrichment is disabled or failed", async () => {
   const { deps, writes } = makeDeps();
   deps.enricher.enrich = async () => null;
   await handleCapture(req, deps);
-  assert.equal(writes[0].aiSuggestedCategory, undefined);
+  assert.equal(writes[0].aiSuggestedCategories, undefined);
 });
 
 test("freezes a copy of the summary into aiSuggestedSummary at write time", async () => {
@@ -207,7 +212,7 @@ test("writes feedback without enrichment when enricher returns null", async () =
   const res = await handleCapture(req, deps);
   assert.equal(res.status, "captured");
   assert.equal(writes[0].summary, undefined);
-  assert.equal(writes[0].category, undefined);
+  assert.equal(writes[0].categories, undefined);
 });
 
 test("includes judge confidence and rationale in the feedback record", async () => {
@@ -224,7 +229,7 @@ test("judges against the original message text and the enricher's own output", a
   assert.equal(judgeCalls[0].originalMessage, "Customers keep asking for SSO");
   assert.equal(judgeCalls[0].channelName, "#general");
   assert.equal(judgeCalls[0].summary, "Customer wants SSO integration.");
-  assert.equal(judgeCalls[0].category, "Feature Request");
+  assert.deepEqual(judgeCalls[0].categories, ["Feature Request"]);
 });
 
 test("does not call the judge when enrichment is disabled or failed", async () => {
@@ -400,11 +405,11 @@ test("checks recent same-category candidates against the new summary", async () 
   setRecentCandidates([{ pageId: "page_old", summary: "An older, unrelated report." }]);
   await handleCapture(req, deps);
   assert.equal(recentByCategoryCalls.length, 1);
-  assert.equal(recentByCategoryCalls[0].category, "Feature Request");
+  assert.deepEqual(recentByCategoryCalls[0].categories, ["Feature Request"]);
   assert.match(recentByCategoryCalls[0].sinceDateIso, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(similarityCalls.length, 1);
   assert.equal(similarityCalls[0].summary, "Customer wants SSO integration.");
-  assert.equal(similarityCalls[0].category, "Feature Request");
+  assert.deepEqual(similarityCalls[0].categories, ["Feature Request"]);
   assert.deepEqual(similarityCalls[0].candidates, [{ pageId: "page_old", summary: "An older, unrelated report." }]);
 });
 
@@ -438,7 +443,7 @@ test("does not check for similarity when enrichment is disabled or failed", asyn
 
 test("writes feedback without a related link when fetching recent candidates fails", async () => {
   const { deps, writes } = makeDeps();
-  deps.notion.findRecentByCategory = async () => { throw new Error("Notion query failed"); };
+  deps.notion.findRecentByCategories = async () => { throw new Error("Notion query failed"); };
   const res = await handleCapture(req, deps);
   assert.equal(res.status, "captured");
   assert.equal(writes[0].relatedFeedbackPageId, undefined);

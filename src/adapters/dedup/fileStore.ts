@@ -72,6 +72,19 @@ export class FileDedupStore implements DedupStore {
     return this.store.get(key) ?? null;
   }
 
+  delete(key: string): void {
+    if (!this.store.has(key)) return;
+    this.store.delete(key);
+    this.flush();
+  }
+
+  findKeyByPageId(pageId: string): string | null {
+    for (const [k, v] of this.store) {
+      if (v === pageId) return k;
+    }
+    return null;
+  }
+
   close(): void {
     this.flush();
   }

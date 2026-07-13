@@ -85,13 +85,13 @@ async function fetchReviewedRows(): Promise<ReviewedRow[]> {
 
     for (const page of res.results) {
       const props = page.properties;
-      const category = props["Category"]?.select?.name as FeedbackCategory | undefined;
-      const aiSuggestedCategory = props["AI Suggested Category"]?.select?.name as FeedbackCategory | undefined;
-      if (!category || !aiSuggestedCategory) continue; // can't compute agreement without both
+      const categories = (props["Categories"]?.multi_select ?? []).map((o: any) => o.name as FeedbackCategory);
+      const aiSuggestedCategories = (props["AI Suggested Categories"]?.multi_select ?? []).map((o: any) => o.name as FeedbackCategory);
+      if (categories.length === 0 || aiSuggestedCategories.length === 0) continue; // can't compute agreement without both
 
       rows.push({
-        category,
-        aiSuggestedCategory,
+        categories,
+        aiSuggestedCategories,
         categoryReviewed: !!props["Category Reviewed"]?.checkbox,
         summaryVerdict: (props["Summary Verdict"]?.select?.name as ReviewedRow["summaryVerdict"]) ?? null,
         confidence: (props["Enrichment Confidence"]?.select?.name as ConfidenceLevel | undefined) ?? null,

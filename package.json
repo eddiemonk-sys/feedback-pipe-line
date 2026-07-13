@@ -14,7 +14,11 @@
     "test": "node --import tsx --test src/core/*.test.ts src/backfill/*.test.ts",
     "setup:test-db": "tsx scripts/createTestDb.ts",
     "report": "tsx scripts/accuracyReport.ts",
-    "correction-log": "tsx scripts/correctionLog.ts"
+    "correction-log": "tsx scripts/correctionLog.ts",
+    "migrate:categories": "tsx scripts/migrateCategoriesToMultiSelect.ts",
+    "eval:gate": "tsx scripts/runEval.ts gate",
+    "eval:enricher": "tsx scripts/runEval.ts enricher",
+    "eval:judge": "tsx scripts/runEval.ts judge"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.107.0",

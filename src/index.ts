@@ -1,6 +1,7 @@
 import { loadConfig } from "./config.js";
 import { consoleLogger } from "./util/logger.js";
 import { loadGuideFile } from "./util/loadGuideFile.js";
+import { loadPrompt } from "./util/loadPrompt.js";
 import { BoltSlackGateway } from "./adapters/slack/boltGateway.js";
 import { NotionFeedbackWriter } from "./adapters/notion/notionWriter.js";
 import { LocalFeedbackWriter } from "./adapters/notion/localWriter.js";
@@ -72,7 +73,7 @@ async function main(): Promise<void> {
 
   const enrichmentStyleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
   const enricher: Enricher = config.anthropicApiKey
-    ? new ClaudeEnricher(config.anthropicApiKey, enrichmentStyleGuide)
+    ? new ClaudeEnricher(config.anthropicApiKey, loadPrompt("enricher"), enrichmentStyleGuide)
     : new NullEnricher();
   logger.info(
     config.anthropicApiKey
@@ -81,7 +82,7 @@ async function main(): Promise<void> {
   );
 
   const judge: Judge = config.anthropicApiKey
-    ? new ClaudeJudge(config.anthropicApiKey)
+    ? new ClaudeJudge(config.anthropicApiKey, loadPrompt("judge"))
     : new NullJudge();
   logger.info(
     config.anthropicApiKey ? "Judging enabled (category + summary checks)" : "Judging disabled — set ANTHROPIC_API_KEY to enable",
