@@ -4,8 +4,8 @@ import { computeAccuracyReport, type ReviewedRow } from "./accuracyReport.js";
 
 function row(overrides: Partial<ReviewedRow> = {}): ReviewedRow {
   return {
-    category: "Feature Request",
-    aiSuggestedCategory: "Feature Request",
+    categories: ["Feature Request"],
+    aiSuggestedCategories: ["Feature Request"],
     categoryReviewed: false,
     summaryVerdict: null,
     confidence: null,
@@ -26,7 +26,7 @@ test("returns null rates and zero counts on no rows", () => {
 
 test("ignores rows where categoryReviewed is false for category stats", () => {
   const report = computeAccuracyReport([
-    row({ categoryReviewed: false, category: "Bug / Broken", aiSuggestedCategory: "Praise" }),
+    row({ categoryReviewed: false, categories: ["Bug / Broken"], aiSuggestedCategories: ["Praise"] }),
   ]);
   assert.equal(report.categoryReviewedCount, 0);
   assert.equal(report.categoryAgreementRate, null);
@@ -34,8 +34,8 @@ test("ignores rows where categoryReviewed is false for category stats", () => {
 
 test("computes 100% agreement when every reviewed category matches", () => {
   const report = computeAccuracyReport([
-    row({ categoryReviewed: true, category: "Feature Request", aiSuggestedCategory: "Feature Request" }),
-    row({ categoryReviewed: true, category: "Praise", aiSuggestedCategory: "Praise" }),
+    row({ categoryReviewed: true, categories: ["Feature Request"], aiSuggestedCategories: ["Feature Request"] }),
+    row({ categoryReviewed: true, categories: ["Praise"], aiSuggestedCategories: ["Praise"] }),
   ]);
   assert.equal(report.categoryReviewedCount, 2);
   assert.equal(report.categoryAgreementRate, 1);
@@ -44,10 +44,10 @@ test("computes 100% agreement when every reviewed category matches", () => {
 
 test("computes a partial agreement rate and lists confusions, most common first", () => {
   const report = computeAccuracyReport([
-    row({ categoryReviewed: true, category: "Candidate Experience", aiSuggestedCategory: "UX / Usability" }),
-    row({ categoryReviewed: true, category: "Candidate Experience", aiSuggestedCategory: "UX / Usability" }),
-    row({ categoryReviewed: true, category: "Bug / Broken", aiSuggestedCategory: "Other" }),
-    row({ categoryReviewed: true, category: "Praise", aiSuggestedCategory: "Praise" }), // agrees
+    row({ categoryReviewed: true, categories: ["Candidate Experience"], aiSuggestedCategories: ["UX / Usability"] }),
+    row({ categoryReviewed: true, categories: ["Candidate Experience"], aiSuggestedCategories: ["UX / Usability"] }),
+    row({ categoryReviewed: true, categories: ["Bug / Broken"], aiSuggestedCategories: ["Other"] }),
+    row({ categoryReviewed: true, categories: ["Praise"], aiSuggestedCategories: ["Praise"] }), // agrees
   ]);
   assert.equal(report.categoryReviewedCount, 4);
   assert.equal(report.categoryAgreementRate, 0.25);
@@ -70,10 +70,10 @@ test("computes summary faithfulness rate independently of category review status
 
 test("breaks confidence calibration down per confidence level, reviewed rows only", () => {
   const report = computeAccuracyReport([
-    row({ categoryReviewed: true, confidence: "High", category: "Praise", aiSuggestedCategory: "Praise" }),
-    row({ categoryReviewed: true, confidence: "High", category: "Praise", aiSuggestedCategory: "Praise" }),
-    row({ categoryReviewed: true, confidence: "Low", category: "Bug / Broken", aiSuggestedCategory: "Other" }),
-    row({ categoryReviewed: false, confidence: "High", category: "Other", aiSuggestedCategory: "Bug / Broken" }), // excluded, not reviewed
+    row({ categoryReviewed: true, confidence: "High", categories: ["Praise"], aiSuggestedCategories: ["Praise"] }),
+    row({ categoryReviewed: true, confidence: "High", categories: ["Praise"], aiSuggestedCategories: ["Praise"] }),
+    row({ categoryReviewed: true, confidence: "Low", categories: ["Bug / Broken"], aiSuggestedCategories: ["Other"] }),
+    row({ categoryReviewed: false, confidence: "High", categories: ["Other"], aiSuggestedCategories: ["Bug / Broken"] }), // excluded, not reviewed
   ]);
   const high = report.confidenceCalibration.find((c) => c.confidence === "High");
   const low = report.confidenceCalibration.find((c) => c.confidence === "Low");
@@ -85,9 +85,9 @@ test("breaks confidence calibration down per confidence level, reviewed rows onl
 
 test("lists every category's coverage, including ones with zero captures", () => {
   const report = computeAccuracyReport([
-    row({ category: "Feature Request", categoryReviewed: true }),
-    row({ category: "Feature Request", categoryReviewed: false }),
-    row({ category: "Praise", categoryReviewed: true }),
+    row({ categories: ["Feature Request"], categoryReviewed: true }),
+    row({ categories: ["Feature Request"], categoryReviewed: false }),
+    row({ categories: ["Praise"], categoryReviewed: true }),
   ]);
   assert.equal(report.categoryCoverage.length, 11); // every category in the taxonomy, always
   const featureRequest = report.categoryCoverage.find((c) => c.category === "Feature Request");
@@ -100,9 +100,9 @@ test("lists every category's coverage, including ones with zero captures", () =>
 
 test("sorts category coverage by reviewedCount ascending, so the least-reviewed categories surface first", () => {
   const report = computeAccuracyReport([
-    row({ category: "Feature Request", categoryReviewed: true }),
-    row({ category: "Feature Request", categoryReviewed: true }),
-    row({ category: "Praise", categoryReviewed: true }),
+    row({ categories: ["Feature Request"], categoryReviewed: true }),
+    row({ categories: ["Feature Request"], categoryReviewed: true }),
+    row({ categories: ["Praise"], categoryReviewed: true }),
   ]);
   const reviewedCounts = report.categoryCoverage.map((c) => c.reviewedCount);
   assert.deepEqual(reviewedCounts, [...reviewedCounts].sort((a, b) => a - b));
