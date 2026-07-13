@@ -6,7 +6,6 @@ import { CATEGORIES } from "../../core/taxonomy.js";
 import type { FeedbackCategory } from "../../core/ports.js";
 
 // These tests verify the adapter's shape contracts without making real API calls.
-// They use a mock that returns a controlled tool_use response.
 
 test("enrich — single category result is valid", async () => {
   const enricher = new ClaudeEnricher("test-key");
