@@ -12,6 +12,13 @@ export interface Config {
   triggerEmoji: string;
   dedupStorePath: string;
   anthropicApiKey?: string;
+  openaiApiKey?: string;
+  /** Model name for the enricher stage. Provider detected from prefix (claude-* / gpt-*). */
+  enricherModel: string;
+  /** Model name for the judge stage. Provider detected from prefix (claude-* / gpt-*). */
+  judgeModel: string;
+  /** Model name for the gate stage. Provider detected from prefix (claude-* / gpt-*). */
+  gateModel: string;
   /** Channels where screenshots may be sent to Claude vision. Empty = disabled everywhere (fail closed). */
   visionEnabledChannelIds: string[];
   /** How far back to look for a possible duplicate when checking for related feedback. */
@@ -57,6 +64,10 @@ export function loadConfig(): Config {
     triggerEmoji: (process.env.TRIGGER_EMOJI ?? "mega").trim(),
     dedupStorePath: (process.env.DEDUP_STORE_PATH ?? "./data/dedup.json").trim(),
     anthropicApiKey: optional("ANTHROPIC_API_KEY"),
+    openaiApiKey: optional("OPENAI_API_KEY"),
+    enricherModel: (process.env.ENRICHER_MODEL ?? "claude-sonnet-4-6").trim(),
+    judgeModel: (process.env.JUDGE_MODEL ?? "claude-sonnet-4-6").trim(),
+    gateModel: (process.env.GATE_MODEL ?? "claude-haiku-4-5-20251001").trim(),
     visionEnabledChannelIds: (process.env.VISION_ENABLED_CHANNEL_IDS ?? "")
       .split(",")
       .map((s) => s.trim())

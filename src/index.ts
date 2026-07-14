@@ -7,9 +7,11 @@ import { NotionFeedbackWriter } from "./adapters/notion/notionWriter.js";
 import { LocalFeedbackWriter } from "./adapters/notion/localWriter.js";
 import { FileDedupStore } from "./adapters/dedup/fileStore.js";
 import { startSocketMode } from "./adapters/transport/socketMode.js";
-import { ClaudeEnricher } from "./adapters/enricher/claudeEnricher.js";
+import { AnthropicLLMClient } from "./adapters/llm/anthropicClient.js";
+import { OpenAILLMClient } from "./adapters/llm/openaiClient.js";
+import { Enricher as EnricherImpl } from "./adapters/enricher/claudeEnricher.js";
 import { NullEnricher } from "./adapters/enricher/nullEnricher.js";
-import { ClaudeJudge } from "./adapters/judge/claudeJudge.js";
+import { Judge as JudgeImpl } from "./adapters/judge/claudeJudge.js";
 import { NullJudge } from "./adapters/judge/nullJudge.js";
 import { ClaudeVisionReader } from "./adapters/vision/claudeVisionReader.js";
 import { NullVisionReader } from "./adapters/vision/nullVisionReader.js";
@@ -17,7 +19,7 @@ import { ClaudeSimilarityDetector } from "./adapters/similarity/claudeSimilarity
 import { NullSimilarityDetector } from "./adapters/similarity/nullSimilarityDetector.js";
 import { handleCapture, type CaptureDeps, type CaptureResult } from "./core/handleCapture.js";
 import type { CaptureRequest } from "./core/events.js";
-import type { Enricher, Judge, VisionReader, SimilarityDetector, SlackGateway, NotionWriter } from "./core/ports.js";
+import type { Enricher, Judge, VisionReader, SimilarityDetector, SlackGateway, NotionWriter, LLMToolCall } from "./core/ports.js";
 
 const SUCCESS_EMOJI = "white_check_mark";
 const FAILURE_EMOJI = "warning";
@@ -53,6 +55,23 @@ async function acknowledge(
   await slack.addReaction(req.channelId, req.messageTs, emoji);
 }
 
+/**
+ * Build the right LLM client for a model name. Provider is auto-detected from the
+ * model prefix (claude-* → Anthropic, gpt-* → OpenAI) so each pipeline stage can be
+ * pointed at a different provider purely by changing its *_MODEL env var.
+ */
+function makeLLMClient(model: string, apiKey: string): LLMToolCall {
+  if (model.startsWith("claude-")) {
+    return new AnthropicLLMClient(apiKey, model);
+  }
+  if (model.startsWith("gpt-")) {
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (!openaiKey) throw new Error(`OPENAI_API_KEY is required when ENRICHER_MODEL or JUDGE_MODEL starts with 'gpt-'. Set it in .env.`);
+    return new OpenAILLMClient(openaiKey, model);
+  }
+  throw new Error(`Unknown model provider for "${model}". Use claude-* for Anthropic or gpt-* for OpenAI.`);
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = consoleLogger;
@@ -71,21 +90,30 @@ async function main(): Promise<void> {
   const dedup = new FileDedupStore(config.dedupStorePath);
   logger.info(`Capture sink: ${config.captureSink}`);
 
+  const hasLLMKey = !!(config.anthropicApiKey || config.openaiApiKey);
+
   const enrichmentStyleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
-  const enricher: Enricher = config.anthropicApiKey
-    ? new ClaudeEnricher(config.anthropicApiKey, loadPrompt("enricher"), enrichmentStyleGuide)
+  const enricher: Enricher = hasLLMKey
+    ? new EnricherImpl(
+        makeLLMClient(config.enricherModel, config.anthropicApiKey ?? config.openaiApiKey!),
+        loadPrompt("enricher"),
+        enrichmentStyleGuide,
+      )
     : new NullEnricher();
   logger.info(
-    config.anthropicApiKey
-      ? `Enrichment enabled (Claude Haiku)${enrichmentStyleGuide.trim() ? " + style guide" : ""}`
-      : "Enrichment disabled — set ANTHROPIC_API_KEY to enable",
+    hasLLMKey
+      ? `Enrichment enabled (${config.enricherModel})${enrichmentStyleGuide.trim() ? " + style guide" : ""}`
+      : "Enrichment disabled — set ANTHROPIC_API_KEY or OPENAI_API_KEY to enable",
   );
 
-  const judge: Judge = config.anthropicApiKey
-    ? new ClaudeJudge(config.anthropicApiKey, loadPrompt("judge"))
+  const judge: Judge = hasLLMKey
+    ? new JudgeImpl(
+        makeLLMClient(config.judgeModel, config.anthropicApiKey ?? config.openaiApiKey!),
+        loadPrompt("judge"),
+      )
     : new NullJudge();
   logger.info(
-    config.anthropicApiKey ? "Judging enabled (category + summary checks)" : "Judging disabled — set ANTHROPIC_API_KEY to enable",
+    hasLLMKey ? `Judging enabled (${config.judgeModel})` : "Judging disabled — set ANTHROPIC_API_KEY or OPENAI_API_KEY to enable",
   );
 
   const vision: VisionReader = config.anthropicApiKey
