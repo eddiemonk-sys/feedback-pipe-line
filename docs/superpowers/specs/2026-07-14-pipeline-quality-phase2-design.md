@@ -246,17 +246,73 @@ Purpose: quick read on pipeline health — are confidence levels trending well?
 
 ---
 
+## 6. Automatic Capture Gate
+
+### Overview
+
+The live FeedbackGate already exists as an adapter (`src/adapters/gate/claudeFeedbackGate.ts`) and is fully designed in `docs/superpowers/plans/2026-07-13-w4-live-gate.md`. Phase 2 delivers the gate quality improvements (LLMToolCall abstraction + prompt v4). The W4 plan delivers the live wiring (Socket Mode message handler, pre-filter, config). Run Phase 2 first.
+
+### Gate in LLMToolClient abstraction
+
+`claudeFeedbackGate.ts` modified in place — Anthropic SDK internals replaced with `LLMToolCall`, class renamed from `ClaudeFeedbackGate` to `FeedbackGate`. New `GATE_MODEL` env var in `.env.example`, defaulting to `claude-haiku-4-5-20251001`.
+
+Gate stays Haiku by default: it runs on every message in every monitored channel. Sonnet rates on that volume aren't justified for a binary yes/no filter — the Sonnet enricher+judge catches any gate misses downstream. Swappable via env when needed.
+
+### Gate prompt v4 (`prompts/gate/v4.md`)
+
+Base: v3 unchanged. Addition: `## Worked examples` section with ~6 feedback examples and ~6 non-feedback examples drawn from `data/gold-set.csv`.
+
+**Selection criteria — pick the hard cases, not the obvious ones:**
+
+Feedback examples to include:
+- Employee relaying customer voice ("a client told me…", "one of our users flagged…")
+- Indirect frustration ("we've been working around this for weeks")
+- Compliance or legal concern embedded in a setup call note
+- Feature gap identified in an internal team discussion
+- Short ambiguous message that IS feedback (easy to miss)
+
+Non-feedback examples to include:
+- Internal logistics ("can you hop on a call to discuss?")
+- Pure social with no product signal
+- Admin message that mentions a product feature but isn't requesting anything
+- Acknowledgement / response message ("sounds good, thanks")
+- Message that looks like feedback but is clearly internal process only
+
+The model already handles clear cases correctly — worked examples are only needed for the borderline calls.
+
+### Medium confidence handling
+
+Medium confidence → auto-capture with `Status = "Needs Review"`. Consistent with how Medium/Low enricher confidence works today. Human reviews the queue in Notion via `npm run report`.
+
+Low confidence → skip (do not capture). The gate is high-recall biased — Low means the gate is confident it is NOT feedback.
+
+### Eval gate
+
+`npm run eval:gate` must show ≥ current precision/recall on the 95-row gold set (`data/gold-set.csv`, `is_feedback` column) before merging. Primary concern is recall (false negatives = missed feedback). Precision failures are caught downstream by the enricher+judge.
+
+### W4 wiring (separate implementation)
+
+Everything else — Socket Mode `message` event handler, pre-filter (`src/liveGate/filter.ts`), `LIVE_GATE_CHANNEL_IDS` config, `notionWebhookPort` for deletion flow — is specified in the W4 plan. Do not re-implement here.
+
+---
+
 ## Data Flow Summary
 
 ```
-Slack message
-  → handleCapture
-    → enrich (Sonnet, v14 prompt, LLMToolCall)
-    → judge (Sonnet, v3 prompt, LLMToolCall)
-    → [if Low] retry enrich with judge note
-    → [if Low] re-judge
-    → write to Notion (final result, Status="Needs Review" if Low/Medium)
-  
+Live Slack message (monitored channel, once W4 is wired)
+  → pre-filter (drops short/bot/ack messages)
+  → gate classify (Haiku, v4 prompt, LLMToolCall)
+    → High → handleCapture, Status="New"
+    → Medium → handleCapture, Status="Needs Review"
+    → Low → skip
+
+handleCapture
+  → enrich (Sonnet, v14 prompt, LLMToolCall)
+  → judge (Sonnet, v3 prompt, LLMToolCall)
+  → [if Low] retry enrich with judge feedback note
+  → [if Low] re-judge
+  → write to Notion (final result, Status="Needs Review" if Low/Medium)
+
 npm run report
   → Review Queue (unreviewed Low/Medium rows)
   → Recent Corrections (human category fixes)
@@ -273,23 +329,26 @@ npm run report
 | `src/core/ports.ts` | Add `LLMToolCall` interface |
 | `src/adapters/llm/anthropicClient.ts` | New — Anthropic implementation |
 | `src/adapters/llm/openaiClient.ts` | New — OpenAI implementation |
-| `src/adapters/enricher/enricher.ts` | Rename + refactor to use `LLMToolCall` |
-| `src/adapters/enricher/claudeEnricher.ts` | Delete (replaced) |
-| `src/adapters/judge/judge.ts` | Rename + refactor to use `LLMToolCall`, add temperature/reasoning |
-| `src/adapters/judge/claudeJudge.ts` | Delete (replaced) |
+| `src/adapters/enricher/claudeEnricher.ts` | Modify — swap Anthropic SDK for `LLMToolCall`, rename class to `Enricher` |
+| `src/adapters/judge/claudeJudge.ts` | Modify — swap Anthropic SDK for `LLMToolCall`, rename class to `Judge`, add temperature/reasoning |
 | `src/index.ts` | Wire provider selection from env |
 | `src/core/handleCapture.ts` | Add retry loop |
 | `prompts/enricher/v14.md` | New — v9 base + worked examples |
 | `prompts/judge/v3.md` | New — v2 base + reasoning + examples + CandExp rule |
 | `prompts/config.yaml` | Bump enricher → v14, judge → v3 |
 | `scripts/accuracyReport.ts` | Add three new report sections |
-| `.env.example` | Add ENRICHER_MODEL, JUDGE_MODEL, OPENAI_API_KEY |
+| `src/adapters/gate/claudeFeedbackGate.ts` | Modify — swap Anthropic SDK for `LLMToolCall`, rename class to `FeedbackGate` |
+| `prompts/gate/v4.md` | New — v3 base + worked examples from 95-row gold set |
+| `prompts/config.yaml` | Bump enricher → v14, judge → v3, gate → v4 |
+| `.env.example` | Add ENRICHER_MODEL, JUDGE_MODEL, GATE_MODEL, OPENAI_API_KEY |
 | `package.json` | Add `openai` dependency |
 
 ---
 
 ## Open Items for Implementation
 
-- Read `data/gold-set.csv` and select one example per category for v14 prompt; flag any category with no row for Eddie to supply
-- Select three gold set rows for judge v3 confidence examples (High/Medium/Low)
+- Read `data/gold-set.csv` and select one example per category for enricher v14 prompt; flag any category with no gold row for Eddie to supply a real Slack message
+- Select three gold set rows for judge v3 confidence examples (one High, one Medium, one Low verdict)
+- Select ~12 gold set rows for gate v4 prompt (6 feedback hard cases, 6 non-feedback hard cases); flag any gap types with no gold row for Eddie to supply
 - Confirm `OPENAI_API_KEY` env var name matches OpenAI SDK expectations
+- Also remove the duplicate `prompts/config.yaml` entry for gate (currently line 1 says `gate: v3`; bump to `gate: v4` in one place only)
