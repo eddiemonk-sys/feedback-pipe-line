@@ -36,7 +36,8 @@ export class ClaudeEnricher implements Enricher {
     try {
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 256,
+        max_tokens: 2048,
+        temperature: 0,
         system: this.systemPrompt,
         messages: [
           {
@@ -47,10 +48,14 @@ export class ClaudeEnricher implements Enricher {
         tools: [
           {
             name: "submit_enrichment",
-            description: "Submit the summary and 1–2 categories for this feedback message.",
+            description: "Submit the classification for this feedback message. Fill reasoning first, then summary and categories.",
             input_schema: {
               type: "object" as const,
               properties: {
+                reasoning: {
+                  type: "string",
+                  description: "1-2 sentences: which signals in the message drove your category choice, and why you ruled out the closest alternative.",
+                },
                 summary: {
                   type: "string",
                   description: "1-2 sentence plain-English summary of the feedback",
@@ -63,7 +68,7 @@ export class ClaudeEnricher implements Enricher {
                   description: "1 or 2 categories that best fit this feedback. Use 2 only when the message genuinely spans two distinct areas.",
                 },
               },
-              required: ["summary", "categories"],
+              required: ["reasoning", "summary", "categories"],
             },
           },
         ],
@@ -73,7 +78,7 @@ export class ClaudeEnricher implements Enricher {
       const toolUse = response.content.find((b) => b.type === "tool_use");
       if (!toolUse || toolUse.type !== "tool_use") return null;
 
-      const input = toolUse.input as { summary: string; categories: string[] };
+      const input = toolUse.input as { reasoning: string; summary: string; categories: string[] };
       if (
         !input.summary ||
         !Array.isArray(input.categories) ||
