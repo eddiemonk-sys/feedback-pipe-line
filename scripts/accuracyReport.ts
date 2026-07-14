@@ -72,6 +72,30 @@ function paragraph(text: string) {
   return { object: "block" as const, type: "paragraph" as const, paragraph: { rich_text: [{ text: { content: text } }] } };
 }
 
+function reviewQueueBlocks(rows: NeedsReviewRow[]): ReturnType<typeof heading2>[] {
+  const lines = rows.length
+    ? rows.map((r) => `${r.dateIso} | ${r.channelName} | ${r.proposedCategory} | ${r.confidence} | ${r.rationale.slice(0, 80)}`)
+    : ["Queue is empty — nothing awaiting review."];
+  return [
+    heading2(`Review Queue (${rows.length} awaiting)`),
+    ...lines.map(paragraph),
+  ];
+}
+
+function correctionsBlocks(rows: CorrectionRow[]): ReturnType<typeof heading2>[] {
+  const lines = rows.length
+    ? rows.map((r) => `${r.dateIso} | ${r.messageExcerpt} | ${r.aiCategory} → ${r.humanCategory}`)
+    : ["No corrections recorded yet."];
+  return [heading2("Recent Corrections (last 20)"), ...lines.map(paragraph)];
+}
+
+function activityBlocks(rows: ActivityRow[]): ReturnType<typeof heading2>[] {
+  const lines = rows.length
+    ? rows.map((r) => `${r.dateIso} | ${r.channelName} | ${r.category} | ${r.confidence}`)
+    : ["No recent activity."];
+  return [heading2("Recent Activity (last 20)"), ...lines.map(paragraph)];
+}
+
 async function fetchReviewedRows(): Promise<ReviewedRow[]> {
   const rows: ReviewedRow[] = [];
   let cursor: string | undefined;
@@ -104,6 +128,117 @@ async function fetchReviewedRows(): Promise<ReviewedRow[]> {
   return rows;
 }
 
+interface NeedsReviewRow {
+  dateIso: string;
+  channelName: string;
+  proposedCategory: string;
+  confidence: string;
+  rationale: string;
+}
+
+async function fetchNeedsReviewRows(): Promise<NeedsReviewRow[]> {
+  const rows: NeedsReviewRow[] = [];
+  let cursor: string | undefined;
+  do {
+    const res: any = await client.databases.query({
+      database_id: NOTION_DATABASE_ID!,
+      filter: {
+        and: [
+          { property: "Status", select: { equals: "Needs Review" } },
+          { property: "Category Reviewed", checkbox: { equals: false } },
+        ],
+      },
+      start_cursor: cursor,
+      page_size: 100,
+    });
+    for (const page of res.results) {
+      const props = page.properties;
+      const categories = (props["Categories"]?.multi_select ?? []).map((o: any) => o.name as string);
+      rows.push({
+        dateIso: props["Date"]?.date?.start ?? "—",
+        channelName: props["Channel"]?.rich_text?.[0]?.plain_text ?? "—",
+        proposedCategory: categories.join(", ") || "—",
+        confidence: props["Enrichment Confidence"]?.select?.name ?? "—",
+        rationale: props["Judge Rationale"]?.rich_text?.[0]?.plain_text ?? "—",
+      });
+    }
+    cursor = res.has_more ? res.next_cursor : undefined;
+  } while (cursor);
+  return rows;
+}
+
+interface CorrectionRow {
+  dateIso: string;
+  messageExcerpt: string;
+  aiCategory: string;
+  humanCategory: string;
+}
+
+async function fetchRecentCorrections(limit = 20): Promise<CorrectionRow[]> {
+  const rows: CorrectionRow[] = [];
+  let cursor: string | undefined;
+  do {
+    const res: any = await client.databases.query({
+      database_id: NOTION_DATABASE_ID!,
+      filter: { property: "Category Reviewed", checkbox: { equals: true } },
+      sorts: [{ property: "Date", direction: "descending" }],
+      start_cursor: cursor,
+      page_size: 100,
+    });
+    for (const page of res.results) {
+      if (rows.length >= limit) break;
+      const props = page.properties;
+      const categories = (props["Categories"]?.multi_select ?? []).map((o: any) => o.name as string);
+      const aiCategories = (props["AI Suggested Categories"]?.multi_select ?? []).map((o: any) => o.name as string);
+      const sameCategories =
+        categories.length === aiCategories.length && categories.every((c: string, i: number) => c === aiCategories[i]);
+      if (sameCategories) continue; // no correction, skip
+      const message: string = props["Message"]?.title?.[0]?.plain_text ?? "";
+      rows.push({
+        dateIso: props["Date"]?.date?.start ?? "—",
+        messageExcerpt: message.slice(0, 80) + (message.length > 80 ? "…" : ""),
+        aiCategory: aiCategories.join(", ") || "—",
+        humanCategory: categories.join(", ") || "—",
+      });
+    }
+    cursor = res.has_more && rows.length < limit ? res.next_cursor : undefined;
+  } while (cursor);
+  return rows;
+}
+
+interface ActivityRow {
+  dateIso: string;
+  channelName: string;
+  category: string;
+  confidence: string;
+}
+
+async function fetchRecentActivity(limit = 20): Promise<ActivityRow[]> {
+  const rows: ActivityRow[] = [];
+  let cursor: string | undefined;
+  do {
+    const res: any = await client.databases.query({
+      database_id: NOTION_DATABASE_ID!,
+      sorts: [{ property: "Date", direction: "descending" }],
+      start_cursor: cursor,
+      page_size: limit,
+    });
+    for (const page of res.results) {
+      if (rows.length >= limit) break;
+      const props = page.properties;
+      const categories = (props["Categories"]?.multi_select ?? []).map((o: any) => o.name as string);
+      rows.push({
+        dateIso: props["Date"]?.date?.start ?? "—",
+        channelName: props["Channel"]?.rich_text?.[0]?.plain_text ?? "—",
+        category: categories.join(", ") || "—",
+        confidence: props["Enrichment Confidence"]?.select?.name ?? "—",
+      });
+    }
+    cursor = undefined; // single page sufficient for activity
+  } while (cursor);
+  return rows;
+}
+
 async function writeReportPage(blocks: ReturnType<typeof reportBlocks>): Promise<void> {
   const reportPageId = process.env.NOTION_REPORT_PAGE_ID;
 
@@ -127,10 +262,23 @@ async function writeReportPage(blocks: ReturnType<typeof reportBlocks>): Promise
 }
 
 async function main(): Promise<void> {
-  const rows = await fetchReviewedRows();
-  const report = computeAccuracyReport(rows);
+  const [reviewedRows, needsReviewRows, corrections, activity] = await Promise.all([
+    fetchReviewedRows(),
+    fetchNeedsReviewRows(),
+    fetchRecentCorrections(),
+    fetchRecentActivity(),
+  ]);
+
+  const report = computeAccuracyReport(reviewedRows);
   console.log(JSON.stringify(report, null, 2));
-  await writeReportPage(reportBlocks(report));
+
+  const blocks = [
+    ...reportBlocks(report),
+    ...reviewQueueBlocks(needsReviewRows),
+    ...correctionsBlocks(corrections),
+    ...activityBlocks(activity),
+  ];
+  await writeReportPage(blocks);
 }
 
 main().catch((err) => {
