@@ -1,10 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
-import type { Judge, JudgeVerdict, FeedbackCategory, ConfidenceLevel } from "../../core/ports.js";
+import type { Judge as JudgePort, LLMToolCall, JudgeVerdict, FeedbackCategory, ConfidenceLevel } from "../../core/ports.js";
 import { CATEGORIES } from "../../core/taxonomy.js";
 
 const CONFIDENCE_LEVELS: ConfidenceLevel[] = ["High", "Medium", "Low"];
 
-const SYSTEM_PROMPT = `You are a quality-control judge for an AI feedback classifier at a B2B SaaS company providing HR / talent-assessment software.
+const DEFAULT_SYSTEM_PROMPT = `You are a quality-control judge for an AI feedback classifier at a B2B SaaS company providing HR / talent-assessment software.
 
 You will be given the ORIGINAL Slack message (the source of truth) and an AI-proposed summary + one or two categories. Check the proposal against the original message and decide how much a human should trust it.
 
@@ -24,13 +23,11 @@ Respond with:
  * never against its own preference — this is what avoids the self-enhancement bias
  * documented for a model informally re-approving its own prior output.
  */
-export class ClaudeJudge implements Judge {
-  private client: Anthropic;
+export class Judge implements JudgePort {
   private systemPrompt: string;
 
-  constructor(apiKey: string, systemPrompt?: string, private model = "claude-haiku-4-5-20251001") {
-    this.client = new Anthropic({ apiKey });
-    this.systemPrompt = systemPrompt ?? SYSTEM_PROMPT;
+  constructor(private llmClient: LLMToolCall, systemPrompt?: string) {
+    this.systemPrompt = systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
   }
 
   async review(
@@ -39,53 +36,41 @@ export class ClaudeJudge implements Judge {
     summary: string,
     categories: FeedbackCategory[],
   ): Promise<JudgeVerdict | null> {
-    try {
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 256,
-        system: this.systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: `Channel: ${channelName}\nOriginal message: ${originalMessage}\n\nProposed summary: ${summary}\nProposed categories: ${categories.join(", ")}`,
-          },
-        ],
-        tools: [
-          {
-            name: "submit_verdict",
-            description: "Submit the confidence and rationale for this enrichment review.",
-            input_schema: {
-              type: "object" as const,
-              properties: {
-                confidence: {
-                  type: "string",
-                  enum: CONFIDENCE_LEVELS,
-                  description: "How much a human should trust these categories + summary",
-                },
-                rationale: {
-                  type: "string",
-                  description: "One short sentence explaining the confidence level",
-                },
-              },
-              required: ["confidence", "rationale"],
+    const input = await this.llmClient.complete({
+      system: this.systemPrompt,
+      userMessage: `Channel: ${channelName}\nOriginal message: ${originalMessage}\n\nProposed summary: ${summary}\nProposed categories: ${categories.join(", ")}`,
+      tool: {
+        name: "submit_verdict",
+        description: "Fill reasoning first, then confidence and rationale.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            reasoning: {
+              type: "string",
+              description: "1-2 sentences: which signals support or contradict the proposed category and summary.",
+            },
+            confidence: {
+              type: "string",
+              enum: CONFIDENCE_LEVELS,
+              description: "How much a human should trust these categories + summary",
+            },
+            rationale: {
+              type: "string",
+              description: "One short sentence explaining the confidence level",
             },
           },
-        ],
-        tool_choice: { type: "tool", name: "submit_verdict" },
-      });
+          required: ["reasoning", "confidence", "rationale"],
+        },
+      },
+      temperature: 0,
+      maxTokens: 512,
+    });
 
-      const toolUse = response.content.find((b) => b.type === "tool_use");
-      if (!toolUse || toolUse.type !== "tool_use") return null;
+    if (!input) return null;
 
-      const input = toolUse.input as { confidence: string; rationale: string };
-      if (!CONFIDENCE_LEVELS.includes(input.confidence as ConfidenceLevel) || !input.rationale) return null;
+    const { confidence, rationale } = input as { reasoning: string; confidence: string; rationale: string };
+    if (!CONFIDENCE_LEVELS.includes(confidence as ConfidenceLevel) || !rationale) return null;
 
-      return {
-        confidence: input.confidence as ConfidenceLevel,
-        rationale: input.rationale,
-      };
-    } catch {
-      return null;
-    }
+    return { confidence: confidence as ConfidenceLevel, rationale };
   }
 }
