@@ -6,10 +6,12 @@ import { consoleLogger as logger } from "../src/util/logger.js";
 import { BoltSlackGateway } from "../src/adapters/slack/boltGateway.js";
 import { NotionFeedbackWriter } from "../src/adapters/notion/notionWriter.js";
 import { FileDedupStore } from "../src/adapters/dedup/fileStore.js";
-import { ClaudeEnricher } from "../src/adapters/enricher/claudeEnricher.js";
+import { AnthropicLLMClient } from "../src/adapters/llm/anthropicClient.js";
+import { Enricher } from "../src/adapters/enricher/claudeEnricher.js";
 import { loadGuideFile } from "../src/util/loadGuideFile.js";
+import { loadPrompt } from "../src/util/loadPrompt.js";
 import { NullEnricher } from "../src/adapters/enricher/nullEnricher.js";
-import { ClaudeJudge } from "../src/adapters/judge/claudeJudge.js";
+import { Judge } from "../src/adapters/judge/claudeJudge.js";
 import { NullJudge } from "../src/adapters/judge/nullJudge.js";
 import { ClaudeVisionReader } from "../src/adapters/vision/claudeVisionReader.js";
 import { NullVisionReader } from "../src/adapters/vision/nullVisionReader.js";
@@ -34,8 +36,8 @@ async function main() {
   const enrichmentStyleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
   const deps: CaptureDeps = {
     slack, notion, dedup, logger, source: "Slack", botUserId,
-    enricher: config.anthropicApiKey ? new ClaudeEnricher(config.anthropicApiKey, enrichmentStyleGuide) : new NullEnricher(),
-    judge: config.anthropicApiKey ? new ClaudeJudge(config.anthropicApiKey) : new NullJudge(),
+    enricher: config.anthropicApiKey ? new Enricher(new AnthropicLLMClient(config.anthropicApiKey, process.env.ENRICHER_MODEL ?? "claude-sonnet-4-6"), loadPrompt("enricher"), enrichmentStyleGuide) : new NullEnricher(),
+    judge: config.anthropicApiKey ? new Judge(new AnthropicLLMClient(config.anthropicApiKey, process.env.JUDGE_MODEL ?? "claude-sonnet-4-6"), loadPrompt("judge")) : new NullJudge(),
     vision: config.anthropicApiKey ? new ClaudeVisionReader(config.anthropicApiKey) : new NullVisionReader(),
     visionEnabledChannelIds: new Set(config.visionEnabledChannelIds),
   };

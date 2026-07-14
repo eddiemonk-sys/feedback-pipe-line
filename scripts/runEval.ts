@@ -7,8 +7,8 @@ import "dotenv/config";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { FeedbackGate } from "../src/adapters/gate/claudeFeedbackGate.js";
 import { AnthropicLLMClient } from "../src/adapters/llm/anthropicClient.js";
-import { ClaudeEnricher } from "../src/adapters/enricher/claudeEnricher.js";
-import { ClaudeJudge } from "../src/adapters/judge/claudeJudge.js";
+import { Enricher } from "../src/adapters/enricher/claudeEnricher.js";
+import { Judge } from "../src/adapters/judge/claudeJudge.js";
 import { loadPrompt } from "../src/util/loadPrompt.js";
 import { loadGuideFile } from "../src/util/loadGuideFile.js";
 import { CATEGORIES } from "../src/core/taxonomy.js";
@@ -167,7 +167,7 @@ async function evalEnricher(config: EvalConfig) {
   if (!config.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY required.");
   const { rows } = parseCSV(readFileSync("./data/gold-set.csv", "utf8"));
   const styleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
-  const enricher = new ClaudeEnricher(config.anthropicApiKey, loadPrompt("enricher"), styleGuide);
+  const enricher = new Enricher(new AnthropicLLMClient(config.anthropicApiKey, process.env.ENRICHER_MODEL ?? "claude-sonnet-4-6"), loadPrompt("enricher"), styleGuide);
   const promptVersion = readPromptVersion("enricher");
 
   const evalRows = rows.map((r) => ({ row: r, gold: goldLabel(r) })).filter((x) => x.gold !== null);
@@ -235,8 +235,8 @@ async function evalJudge(config: EvalConfig) {
   if (!config.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY required.");
   const { rows } = parseCSV(readFileSync("./data/gold-set.csv", "utf8"));
   const styleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
-  const enricher = new ClaudeEnricher(config.anthropicApiKey, loadPrompt("enricher"), styleGuide);
-  const judge = new ClaudeJudge(config.anthropicApiKey, loadPrompt("judge"));
+  const enricher = new Enricher(new AnthropicLLMClient(config.anthropicApiKey, process.env.ENRICHER_MODEL ?? "claude-sonnet-4-6"), loadPrompt("enricher"), styleGuide);
+  const judge = new Judge(new AnthropicLLMClient(config.anthropicApiKey, process.env.JUDGE_MODEL ?? "claude-sonnet-4-6"), loadPrompt("judge"));
   const enricherVersion = readPromptVersion("enricher");
   const judgeVersion = readPromptVersion("judge");
 
