@@ -119,12 +119,12 @@ export async function handleCapture(
         : `[No message text — only an attached screenshot. Screenshot shows: ${visualDescription}]`
       : text;
 
-    const enrichment = await deps.enricher.enrich(enrichmentInput, channelName).catch((err) => {
+    let enrichment = await deps.enricher.enrich(enrichmentInput, channelName).catch((err) => {
       logger.warn("Enrichment failed — capturing without summary/category", { err: String(err) });
       return null;
     });
 
-    const verdict = enrichment
+    let verdict = enrichment
       ? await deps.judge
           .review(enrichmentInput, channelName, enrichment.summary, enrichment.categories)
           .catch((err) => {
@@ -132,6 +132,29 @@ export async function handleCapture(
             return null;
           })
       : null;
+
+    if (verdict?.confidence === "Low" && enrichment) {
+      logger.info("Low confidence — retrying enrichment", {
+        key,
+        firstCategories: enrichment.categories,
+        judgeRationale: verdict.rationale,
+      });
+      const retryInput = `${enrichmentInput}\n\nNote: a previous classification of this message was rated Low confidence. Reviewer note: "${verdict.rationale}". Reconsider the category — pay particular attention to which category most precisely matches the primary signal.`;
+      const retryEnrichment = await deps.enricher.enrich(retryInput, channelName).catch((err) => {
+        logger.warn("Retry enrichment failed — keeping original result", { err: String(err) });
+        return null;
+      });
+      if (retryEnrichment) {
+        const retryVerdict = await deps.judge
+          .review(retryInput, channelName, retryEnrichment.summary, retryEnrichment.categories)
+          .catch((err) => {
+            logger.warn("Retry judging failed", { err: String(err) });
+            return null;
+          });
+        enrichment = retryEnrichment;
+        verdict = retryVerdict;
+      }
+    }
 
     const relatedMatch = enrichment ? await findRelatedFeedback(deps, enrichment.summary, enrichment.categories, logger) : null;
 

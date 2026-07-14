@@ -457,3 +457,81 @@ test("writes feedback without a related link when the similarity detector fails"
   assert.equal(res.status, "captured");
   assert.equal(writes[0].relatedFeedbackPageId, undefined);
 });
+
+test("handleCapture — retries enrichment when judge returns Low confidence", async () => {
+  const { deps, writes, judgeCalls, enrichCalls } = makeDeps();
+  let judgeCallCount = 0;
+  deps.judge = {
+    review: async (_msg, _ch, _sum, _cats) => {
+      judgeCallCount++;
+      // First call returns Low; second (retry) returns Medium
+      return judgeCallCount === 1
+        ? { confidence: "Low", rationale: "Category mismatch — Other does not fit." }
+        : { confidence: "Medium", rationale: "Plausible but uncertain." };
+    },
+  };
+  let enrichCallCount = 0;
+  deps.enricher = {
+    enrich: async (text) => {
+      enrichCalls.push(text);
+      enrichCallCount++;
+      return {
+        summary: enrichCallCount === 1 ? "Original summary." : "Retry summary.",
+        categories: ["Feature Request" as FeedbackCategory],
+      };
+    },
+  };
+
+  await handleCapture(req, deps);
+
+  // enricher called twice: original + retry
+  assert.strictEqual(enrichCalls.length, 2);
+  // retry input contains judge rationale note
+  assert.ok(enrichCalls[1].includes("Category mismatch — Other does not fit."));
+  // judge called twice: original + retry
+  assert.strictEqual(judgeCallCount, 2);
+  // final write uses retry enrichment
+  assert.strictEqual(writes[0].summary, "Retry summary.");
+  assert.strictEqual(writes[0].confidence, "Medium");
+});
+
+test("handleCapture — keeps original enrichment when retry enrichment fails", async () => {
+  const { deps, writes } = makeDeps();
+  deps.judge = {
+    review: async () => ({ confidence: "Low", rationale: "Wrong category." }),
+  };
+  let enrichCallCount = 0;
+  deps.enricher = {
+    enrich: async () => {
+      enrichCallCount++;
+      if (enrichCallCount === 1) return { summary: "Original.", categories: ["Feature Request" as FeedbackCategory] };
+      return null; // retry fails
+    },
+  };
+
+  await handleCapture(req, deps);
+
+  // Still captured with original enrichment
+  assert.strictEqual(writes[0].summary, "Original.");
+  assert.strictEqual(writes[0].confidence, "Low");
+});
+
+test("handleCapture — does NOT retry when judge returns Medium", async () => {
+  const { deps, enrichCalls } = makeDeps();
+  deps.judge = {
+    review: async () => ({ confidence: "Medium", rationale: "Plausible." }),
+  };
+  let enrichCallCount = 0;
+  deps.enricher = {
+    enrich: async (text) => {
+      enrichCalls.push(text);
+      enrichCallCount++;
+      return { summary: "Summary.", categories: ["Feature Request" as FeedbackCategory] };
+    },
+  };
+
+  await handleCapture(req, deps);
+
+  // enricher called only once — no retry for Medium
+  assert.strictEqual(enrichCalls.length, 1);
+});
