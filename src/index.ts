@@ -66,7 +66,7 @@ function makeLLMClient(model: string, apiKey: string): LLMToolCall {
   }
   if (model.startsWith("gpt-")) {
     const openaiKey = process.env.OPENAI_API_KEY;
-    if (!openaiKey) throw new Error(`OPENAI_API_KEY is required when ENRICHER_MODEL or JUDGE_MODEL starts with 'gpt-'. Set it in .env.`);
+    if (!openaiKey) throw new Error(`OPENAI_API_KEY is required when ENRICHER_MODEL, JUDGE_MODEL, or GATE_MODEL starts with 'gpt-'. Set it in .env.`);
     return new OpenAILLMClient(openaiKey, model);
   }
   throw new Error(`Unknown model provider for "${model}". Use claude-* for Anthropic or gpt-* for OpenAI.`);

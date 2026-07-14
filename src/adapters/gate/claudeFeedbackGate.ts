@@ -1,63 +1,90 @@
-import Anthropic from "@anthropic-ai/sdk";
-import type { FeedbackGate, FeedbackGateResult, ConfidenceLevel } from "../../core/ports.js";
+import type { FeedbackGate as FeedbackGatePort, LLMToolCall, FeedbackGateResult, ConfidenceLevel } from "../../core/ports.js";
 
 const CONFIDENCE_LEVELS: ConfidenceLevel[] = ["High", "Medium", "Low"];
 
-const SYSTEM_PROMPT = `You are triaging historical Slack messages at a B2B SaaS company providing HR / talent-assessment software, to find CUSTOMER FEEDBACK that was never formally logged.
+const DEFAULT_SYSTEM_PROMPT = `You are triaging Slack messages at a B2B SaaS company providing HR / talent-assessment software, to find PRODUCT FEEDBACK worth logging — bugs, missing features, usability friction, pricing concerns, onboarding issues, compliance gaps, or any signal that something needs to improve.
 
-Customer feedback includes: bug reports, feature requests, complaints, praise, usability friction, pricing/commercial reactions, onboarding pain, reporting/data gaps, candidate-experience remarks, and assessment accuracy/validity concerns — whether stated directly by a customer or relayed by a colleague ("client said X", "a candidate complained that Y").
+**Context:** These Slack channels are used by Spotted Zebra employees — Sales, Customer Success, Product, and Engineering. Messages may relay what a customer said directly, or they may be an internal employee observing, noticing, or discussing a product gap. Both are worth capturing. You do not need a customer's voice explicitly quoted — an employee identifying a real product issue counts as feedback worth logging.
 
-NOT feedback: internal logistics, scheduling, greetings, standups, deploy notices, jokes, and generic chit-chat with no product signal.
+## Flag these:
 
-Bias toward RECALL: a human reviews every message you flag, so when a message plausibly carries any customer signal, flag it. Only withhold messages with clearly no product/customer signal.`;
+- Bug reports or unexpected behaviour, whoever noticed it
+- Missing features or capability gaps, whether a customer asked or an employee identified them
+- Usability friction, confusing UX, or onboarding pain
+- Pricing, commercial, or compliance concerns
+- Customer requests or complaints relayed by an employee ("client said X", "NIQ has asked about Y")
+- Internal observations that something doesn't work well, is confusing, or needs to change
+- Call notes or account updates that reveal a client need, gap, or complaint
+
+## Do NOT flag — reject only messages with zero product signal:
+
+**Pure social / celebration:** Messages that are only enthusiasm, praise, or congratulations with no product substance. Reject when the entire message is social and nothing in it points to a product gap or need.
+
+Examples to reject:
+- "Incredible!! :star-struck: Well done team!!"
+- "Music to my ears! Love it, thank you"
+- "nice work @person - love this!"
+
+**Pure logistics and coordination with no product signal:** Meeting scheduling, document sharing requests, task handoffs, and action-item lists where there is literally nothing about the product.
+
+Examples to reject:
+- "Can you share the doc you've created to answer Q1?" (pure document request)
+- "Agenda for call at 9:30: Any other confirmed roles yet?" (pure meeting prep)
+- "Right, got a nice doc to respond to the first point now courtesy of Brad! Just need confirmation on..." (pure coordination)
+
+**Internal access / permissions questions with no product insight:** An employee asking about their own access to internal tools, with nothing that reveals a product gap.
+
+Examples to reject:
+- "Can you check I have permissions for [internal tool]?"
+- "So strange, that one was just flat out not coming up on search for me!! Can you check I have permissions...?" (employee's own access, not a product issue)
+
+## Grey area — when in doubt, flag it:
+
+A human reviews every message you flag. If a message contains ANY product signal — even buried in logistics — flag it. Only withhold messages that are entirely social, entirely logistical, or entirely about internal access with no product substance whatsoever.
+
+**Bias toward RECALL.** False negatives (missing real feedback) are worse than false positives (flagging something that gets rejected in human review). When genuinely unsure, err on the side of flagging.`;
 
 /** High-recall "is this likely customer feedback?" gate. Fails open (returns null) on error. */
-export class ClaudeFeedbackGate implements FeedbackGate {
-  private client: Anthropic;
+export class FeedbackGate implements FeedbackGatePort {
   private systemPrompt: string;
 
-  constructor(apiKey: string, systemPrompt?: string, private model = "claude-haiku-4-5-20251001") {
-    this.client = new Anthropic({ apiKey });
-    this.systemPrompt = systemPrompt ?? SYSTEM_PROMPT;
+  constructor(private llmClient: LLMToolCall, systemPrompt?: string) {
+    this.systemPrompt = systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
   }
 
   async classify(text: string, channelName: string): Promise<FeedbackGateResult | null> {
-    try {
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 256,
-        system: this.systemPrompt,
-        messages: [{ role: "user", content: `Channel: ${channelName}\nMessage: ${text}` }],
-        tools: [
-          {
-            name: "submit_triage",
-            description: "Submit whether this message is likely customer feedback.",
-            input_schema: {
-              type: "object" as const,
-              properties: {
-                is_likely_feedback: { type: "boolean", description: "True if plausibly customer feedback (recall-biased)" },
-                confidence: { type: "string", enum: CONFIDENCE_LEVELS, description: "Confidence in the decision" },
-                rationale: { type: "string", description: "One short sentence of reasoning" },
-              },
-              required: ["is_likely_feedback", "confidence", "rationale"],
-            },
+    const input = await this.llmClient.complete({
+      system: this.systemPrompt,
+      userMessage: `Channel: ${channelName}\nMessage: ${text}`,
+      tool: {
+        name: "submit_triage",
+        description: "Submit whether this message is likely customer feedback.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            is_likely_feedback: { type: "boolean", description: "True if plausibly customer feedback (recall-biased)" },
+            confidence: { type: "string", enum: CONFIDENCE_LEVELS, description: "Confidence in the decision" },
+            rationale: { type: "string", description: "One short sentence of reasoning" },
           },
-        ],
-        tool_choice: { type: "tool", name: "submit_triage" },
-      });
+          required: ["is_likely_feedback", "confidence", "rationale"],
+        },
+      },
+      maxTokens: 256,
+    });
 
-      const toolUse = response.content.find((b) => b.type === "tool_use");
-      if (!toolUse || toolUse.type !== "tool_use") return null;
-      const input = toolUse.input as { is_likely_feedback: boolean; confidence: string; rationale: string };
-      if (!CONFIDENCE_LEVELS.includes(input.confidence as ConfidenceLevel) || typeof input.is_likely_feedback !== "boolean") return null;
+    if (!input) return null;
 
-      return {
-        isLikelyFeedback: input.is_likely_feedback,
-        confidence: input.confidence as ConfidenceLevel,
-        rationale: input.rationale ?? "",
-      };
-    } catch {
-      return null;
-    }
+    const { is_likely_feedback, confidence, rationale } = input as {
+      is_likely_feedback: boolean;
+      confidence: string;
+      rationale: string;
+    };
+    if (!CONFIDENCE_LEVELS.includes(confidence as ConfidenceLevel) || typeof is_likely_feedback !== "boolean") return null;
+
+    return {
+      isLikelyFeedback: is_likely_feedback,
+      confidence: confidence as ConfidenceLevel,
+      rationale: rationale ?? "",
+    };
   }
 }

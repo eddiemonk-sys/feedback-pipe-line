@@ -5,7 +5,8 @@
 //   npx tsx scripts/runEval.ts judge     — judge calibration (runs enricher + judge; expensive)
 import "dotenv/config";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { ClaudeFeedbackGate } from "../src/adapters/gate/claudeFeedbackGate.js";
+import { FeedbackGate } from "../src/adapters/gate/claudeFeedbackGate.js";
+import { AnthropicLLMClient } from "../src/adapters/llm/anthropicClient.js";
 import { ClaudeEnricher } from "../src/adapters/enricher/claudeEnricher.js";
 import { ClaudeJudge } from "../src/adapters/judge/claudeJudge.js";
 import { loadPrompt } from "../src/util/loadPrompt.js";
@@ -84,7 +85,8 @@ function f1Score(tp: number, fp: number, fn: number): number {
 async function evalGate(config: EvalConfig) {
   if (!config.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY required.");
   const { rows } = parseCSV(readFileSync("./data/gold-set.csv", "utf8"));
-  const gate = new ClaudeFeedbackGate(config.anthropicApiKey, loadPrompt("gate"));
+  const gateModel = process.env.GATE_MODEL?.trim() || "claude-haiku-4-5-20251001";
+  const gate = new FeedbackGate(new AnthropicLLMClient(config.anthropicApiKey, gateModel), loadPrompt("gate"));
   const promptVersion = readPromptVersion("gate");
 
   const results: unknown[] = [];

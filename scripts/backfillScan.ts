@@ -4,8 +4,9 @@ import { writeFileSync } from "node:fs";
 import { loadConfig } from "../src/config.js";
 import { consoleLogger as logger } from "../src/util/logger.js";
 import { BoltSlackGateway } from "../src/adapters/slack/boltGateway.js";
-import { ClaudeFeedbackGate } from "../src/adapters/gate/claudeFeedbackGate.js";
+import { FeedbackGate } from "../src/adapters/gate/claudeFeedbackGate.js";
 import { NullFeedbackGate } from "../src/adapters/gate/nullFeedbackGate.js";
+import { AnthropicLLMClient } from "../src/adapters/llm/anthropicClient.js";
 import { ClaudeEnricher } from "../src/adapters/enricher/claudeEnricher.js";
 import { loadGuideFile } from "../src/util/loadGuideFile.js";
 import { loadPrompt } from "../src/util/loadPrompt.js";
@@ -30,7 +31,7 @@ async function main() {
 
   const slack = new BoltSlackGateway(config.slackBotToken, logger);
   const botUserId = await slack.getBotUserId();
-  const gate = config.anthropicApiKey ? new ClaudeFeedbackGate(config.anthropicApiKey, loadPrompt("gate")) : new NullFeedbackGate();
+  const gate = config.anthropicApiKey ? new FeedbackGate(new AnthropicLLMClient(config.anthropicApiKey, config.gateModel), loadPrompt("gate")) : new NullFeedbackGate();
   const enrichmentStyleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
   const enricher = config.anthropicApiKey ? new ClaudeEnricher(config.anthropicApiKey, loadPrompt("enricher"), enrichmentStyleGuide) : new NullEnricher();
   const vision = config.anthropicApiKey ? new ClaudeVisionReader(config.anthropicApiKey) : new NullVisionReader();
