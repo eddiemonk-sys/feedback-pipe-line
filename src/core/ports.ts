@@ -97,6 +97,25 @@ export type FeedbackCategory =
   | "Assessment Accuracy/Validity"
   | "Compliance / Legal / Governance";
 
+/**
+ * Provider-agnostic forced tool-call interface. The model MUST call the named tool —
+ * both Anthropic and OpenAI support this via tool_choice. Returns the parsed tool input,
+ * or null on any failure (API error, malformed response, missing tool call).
+ */
+export interface LLMToolCall {
+  complete(params: {
+    system: string;
+    userMessage: string;
+    tool: {
+      name: string;
+      description: string;
+      inputSchema: Record<string, unknown>;
+    };
+    temperature?: number;
+    maxTokens: number;
+  }): Promise<Record<string, unknown> | null>;
+}
+
 export interface EnrichmentResult {
   summary: string;
   /** 1–2 AI-assigned categories. Never empty. */
