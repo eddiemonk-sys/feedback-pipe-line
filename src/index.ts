@@ -13,13 +13,11 @@ import { Enricher as EnricherImpl } from "./adapters/enricher/claudeEnricher.js"
 import { NullEnricher } from "./adapters/enricher/nullEnricher.js";
 import { Judge as JudgeImpl } from "./adapters/judge/claudeJudge.js";
 import { NullJudge } from "./adapters/judge/nullJudge.js";
-import { ClaudeVisionReader } from "./adapters/vision/claudeVisionReader.js";
-import { NullVisionReader } from "./adapters/vision/nullVisionReader.js";
 import { ClaudeSimilarityDetector } from "./adapters/similarity/claudeSimilarityDetector.js";
 import { NullSimilarityDetector } from "./adapters/similarity/nullSimilarityDetector.js";
 import { handleCapture, type CaptureDeps, type CaptureResult } from "./core/handleCapture.js";
 import type { CaptureRequest } from "./core/events.js";
-import type { Enricher, Judge, VisionReader, SimilarityDetector, SlackGateway, NotionWriter, LLMToolCall } from "./core/ports.js";
+import type { Enricher, Judge, SimilarityDetector, SlackGateway, NotionWriter, LLMToolCall } from "./core/ports.js";
 
 const SUCCESS_EMOJI = "white_check_mark";
 const FAILURE_EMOJI = "warning";
@@ -116,16 +114,6 @@ async function main(): Promise<void> {
     hasLLMKey ? `Judging enabled (${config.judgeModel})` : "Judging disabled — set ANTHROPIC_API_KEY or OPENAI_API_KEY to enable",
   );
 
-  const vision: VisionReader = config.anthropicApiKey
-    ? new ClaudeVisionReader(config.anthropicApiKey)
-    : new NullVisionReader();
-  const visionEnabledChannelIds = new Set(config.visionEnabledChannelIds);
-  logger.info(
-    visionEnabledChannelIds.size > 0
-      ? `Vision enabled for ${visionEnabledChannelIds.size} channel(s)`
-      : "Vision disabled — set VISION_ENABLED_CHANNEL_IDS to enable for specific channels",
-  );
-
   const similarityRules = loadGuideFile(config.similarityRulesPath);
   const similarityDetector: SimilarityDetector = config.anthropicApiKey
     ? new ClaudeSimilarityDetector(config.anthropicApiKey, similarityRules)
@@ -145,8 +133,6 @@ async function main(): Promise<void> {
     botUserId,
     enricher,
     judge,
-    vision,
-    visionEnabledChannelIds,
     similarityDetector,
     similarityWindowDays: config.similarityWindowDays,
   };

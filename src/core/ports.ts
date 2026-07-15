@@ -148,15 +148,6 @@ export interface Judge {
   ): Promise<JudgeVerdict | null>;
 }
 
-export interface VisionResult {
-  description: string;
-}
-
-/** Describes an attached screenshot. Scope: one image per message, description only (no OCR/coordinates). */
-export interface VisionReader {
-  describe(image: ImageAttachment, channelName: string): Promise<VisionResult | null>;
-}
-
 export interface SimilarMatch {
   matchedPageId: string;
   rationale: string;
@@ -174,7 +165,7 @@ export interface FeedbackGateResult {
 /**
  * Detects whether a new capture duplicates an existing one, pointwise against a bounded
  * set of recent same-category candidates — not a general similarity search. Fails open
- * (null) on any error, same as Judge/VisionReader; a failed check must never block a capture.
+ * (null) on any error, same as Judge; a failed check must never block a capture.
  */
 export interface SimilarityDetector {
   findSimilar(

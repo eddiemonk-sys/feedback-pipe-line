@@ -1,5 +1,5 @@
 import type { CaptureRequest } from "./events.js";
-import type { SlackGateway, NotionWriter, DedupStore, Enricher, Judge, VisionReader, SimilarityDetector, ImageAttachment } from "./ports.js";
+import type { SlackGateway, NotionWriter, DedupStore, Enricher, Judge, SimilarityDetector, ImageAttachment } from "./ports.js";
 import type { Logger } from "../util/logger.js";
 
 export type CaptureStatus = "captured" | "flagger_added" | "duplicate" | "no_message" | "error";
@@ -21,9 +21,6 @@ export interface CaptureDeps {
   botUserId?: string;
   enricher: Enricher;
   judge: Judge;
-  vision: VisionReader;
-  /** Channels where screenshots may be sent for vision processing. Empty = nowhere. */
-  visionEnabledChannelIds: Set<string>;
   similarityDetector: SimilarityDetector;
   /** How far back to look for a possible duplicate, in days. */
   similarityWindowDays: number;
@@ -93,7 +90,6 @@ export async function handleCapture(
       slack.getPermalink(req.channelId, req.messageTs),
     ]);
 
-    const hasRealText = !!message.text.trim();
     let text = message.text.trim() || "(no text — attachment or file)";
     if (req.triggerType === "mention" && botUserId) {
       text = text.replace(new RegExp(`<@${botUserId}>\\s*`, "g"), "").trim() ||
@@ -102,31 +98,17 @@ export async function handleCapture(
 
     const dateIso = new Date(Number(req.messageTs) * 1000).toISOString().slice(0, 10);
 
-    // Vision runs BEFORE enrichment so a screenshot's content can inform the summary/category —
-    // otherwise an image-only message enriches on just the "(no text...)" placeholder and the
-    // AI (correctly) says it can't classify something with no text, even though vision already
-    // read the screenshot fine.
     const imageUrl = message.imageUrls?.[0];
-    const image =
-      imageUrl && deps.visionEnabledChannelIds.has(req.channelId)
-        ? await fetchImage(deps, imageUrl, logger)
-        : null;
-    const visualDescription = image ? await describeImage(deps, image, channelName, logger) : undefined;
+    const image = imageUrl ? await fetchImage(deps, imageUrl, logger) : null;
 
-    const enrichmentInput = visualDescription
-      ? hasRealText
-        ? `${text}\n\n[Attached screenshot shows: ${visualDescription}]`
-        : `[No message text — only an attached screenshot. Screenshot shows: ${visualDescription}]`
-      : text;
-
-    let enrichment = await deps.enricher.enrich(enrichmentInput, channelName).catch((err) => {
+    let enrichment = await deps.enricher.enrich(text, channelName, image ? [image] : undefined).catch((err) => {
       logger.warn("Enrichment failed — capturing without summary/category", { err: String(err) });
       return null;
     });
 
     let verdict = enrichment
       ? await deps.judge
-          .review(enrichmentInput, channelName, enrichment.summary, enrichment.categories)
+          .review(text, channelName, enrichment.summary, enrichment.categories)
           .catch((err) => {
             logger.warn("Judging failed — capturing without confidence/rationale", { err: String(err) });
             return null;
@@ -140,7 +122,7 @@ export async function handleCapture(
         firstCategories: enrichment.categories,
         judgeRationale: verdict.rationale,
       });
-      const retryInput = `${enrichmentInput}\n\nNote: a previous classification of this message was rated Low confidence. Reviewer note: "${verdict.rationale}". Reconsider the category — pay particular attention to which category most precisely matches the primary signal.`;
+      const retryInput = `${text}\n\nNote: a previous classification of this message was rated Low confidence. Reviewer note: "${verdict.rationale}". Reconsider the category — pay particular attention to which category most precisely matches the primary signal.`;
       const retryEnrichment = await deps.enricher.enrich(retryInput, channelName).catch((err) => {
         logger.warn("Retry enrichment failed — keeping original result", { err: String(err) });
         return null;
@@ -174,7 +156,6 @@ export async function handleCapture(
       aiSuggestedSummary: enrichment?.summary,
       confidence: verdict?.confidence,
       rationale: verdict?.rationale,
-      visualDescription,
       image: image ?? undefined,
       relatedFeedbackPageId: relatedMatch?.matchedPageId,
       relatedFeedbackRationale: relatedMatch?.rationale,
@@ -221,21 +202,5 @@ async function fetchImage(
   } catch (err) {
     logger.warn("Image download failed — capturing without the screenshot", { err: String(err) });
     return null;
-  }
-}
-
-/** Describes an already-downloaded screenshot; fails open (undefined) on any error. */
-async function describeImage(
-  deps: CaptureDeps,
-  image: ImageAttachment,
-  channelName: string,
-  logger: Logger,
-): Promise<string | undefined> {
-  try {
-    const result = await deps.vision.describe(image, channelName);
-    return result?.description;
-  } catch (err) {
-    logger.warn("Vision failed — capturing without visualDescription", { err: String(err) });
-    return undefined;
   }
 }
