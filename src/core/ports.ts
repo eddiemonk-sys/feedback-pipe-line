@@ -124,7 +124,7 @@ export interface EnrichmentResult {
 }
 
 export interface Enricher {
-  enrich(text: string, channelName: string): Promise<EnrichmentResult | null>;
+  enrich(text: string, channelName: string, images?: ImageAttachment[]): Promise<EnrichmentResult | null>;
 }
 
 export type ConfidenceLevel = "High" | "Medium" | "Low";

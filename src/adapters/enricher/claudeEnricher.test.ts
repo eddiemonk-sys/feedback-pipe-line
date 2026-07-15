@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Enricher } from "./claudeEnricher.js";
 import { CATEGORIES } from "../../core/taxonomy.js";
-import type { FeedbackCategory, LLMToolCall } from "../../core/ports.js";
+import type { FeedbackCategory, LLMToolCall, ImageAttachment } from "../../core/ports.js";
 
 function makeMockLLMClient(response: Record<string, unknown> | null): LLMToolCall {
   return {
@@ -54,4 +54,40 @@ test("CATEGORIES includes all 11 taxonomy entries", () => {
   assert.ok(CATEGORIES.includes("Compliance / Legal / Governance" as FeedbackCategory));
   assert.ok(CATEGORIES.includes("Candidate Experience" as FeedbackCategory));
   assert.strictEqual(CATEGORIES.length, 11);
+});
+
+test("Enricher — passes images to LLMToolCall when provided", async () => {
+  const capturedParams: any[] = [];
+  const client: LLMToolCall = {
+    async complete(params) {
+      capturedParams.push(params);
+      return {
+        reasoning: "Feature request signal.",
+        summary: "User wants SSO integration.",
+        categories: ["Feature Request"],
+      };
+    },
+  };
+  const enricher = new Enricher(client);
+  const image: ImageAttachment = { data: "ZmFrZQ==", mimeType: "image/png" };
+  await enricher.enrich("Please add SSO", "#general", [image]);
+  assert.strictEqual(capturedParams.length, 1);
+  assert.deepStrictEqual(capturedParams[0].images, [image]);
+});
+
+test("Enricher — omits images from LLMToolCall when not provided", async () => {
+  const capturedParams: any[] = [];
+  const client: LLMToolCall = {
+    async complete(params) {
+      capturedParams.push(params);
+      return {
+        reasoning: "Feature request signal.",
+        summary: "User wants SSO integration.",
+        categories: ["Feature Request"],
+      };
+    },
+  };
+  const enricher = new Enricher(client);
+  await enricher.enrich("Please add SSO", "#general");
+  assert.strictEqual(capturedParams[0].images, undefined);
 });

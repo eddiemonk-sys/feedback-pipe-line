@@ -1,4 +1,4 @@
-import type { Enricher as EnricherPort, LLMToolCall, EnrichmentResult, FeedbackCategory } from "../../core/ports.js";
+import type { Enricher as EnricherPort, LLMToolCall, EnrichmentResult, FeedbackCategory, ImageAttachment } from "../../core/ports.js";
 import { CATEGORIES } from "../../core/taxonomy.js";
 import { appendGuidance } from "../../core/promptGuidance.js";
 
@@ -29,7 +29,7 @@ export class Enricher implements EnricherPort {
     this.systemPrompt = appendGuidance(systemPrompt ?? DEFAULT_SYSTEM_PROMPT, styleGuide);
   }
 
-  async enrich(text: string, channelName: string): Promise<EnrichmentResult | null> {
+  async enrich(text: string, channelName: string, images?: ImageAttachment[]): Promise<EnrichmentResult | null> {
     const input = await this.llmClient.complete({
       system: this.systemPrompt,
       userMessage: `Channel: ${channelName}\nMessage: ${text}`,
@@ -45,7 +45,7 @@ export class Enricher implements EnricherPort {
             },
             summary: {
               type: "string",
-              description: "1-2 sentence plain-English summary of the feedback",
+              description: "Structured summary: one lead sentence (most important point first, include client name and deadline if stated), then 2-4 bullets (•) for each distinct detail. Dates and deadlines MUST appear verbatim as their own bullet.",
             },
             categories: {
               type: "array",
@@ -60,6 +60,7 @@ export class Enricher implements EnricherPort {
       },
       temperature: 0,
       maxTokens: 2048,
+      images,
     });
 
     if (!input) return null;
