@@ -45,7 +45,7 @@ export class Enricher implements EnricherPort {
             },
             summary: {
               type: "string",
-              description: "Structured summary: one lead sentence (most important point first, include client name and deadline if stated), then 2-4 bullets (•) for each distinct detail. Dates and deadlines MUST appear verbatim as their own bullet.",
+              description: "1-2 sentence plain-English summary of the feedback",
             },
             categories: {
               type: "array",
