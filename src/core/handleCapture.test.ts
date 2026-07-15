@@ -19,7 +19,6 @@ function makeDeps() {
   const store = new Map<string, string>(); // key → pageId
   const judgeCalls: Array<{ originalMessage: string; channelName: string; summary: string; categories: FeedbackCategory[] }> = [];
   const downloadCalls: string[] = [];
-  const visionCalls: Array<{ data: string; mimeType: string; channelName: string }> = [];
   const enrichCalls: string[] = [];
   const recentByCategoryCalls: Array<{ categories: FeedbackCategory[]; sinceDateIso: string }> = [];
   const similarityCalls: Array<{ summary: string; categories: FeedbackCategory[]; candidates: Array<{ pageId: string; summary: string }> }> = [];
@@ -65,7 +64,7 @@ function makeDeps() {
       },
     },
     enricher: {
-      enrich: async (text) => {
+      enrich: async (text, _channelName, _images) => {
         enrichCalls.push(text);
         return {
           summary: "Customer wants SSO integration.",
@@ -79,13 +78,6 @@ function makeDeps() {
         return { confidence: "High", rationale: "Category and summary both match the source message." };
       },
     },
-    vision: {
-      describe: async (image, channelName) => {
-        visionCalls.push({ data: image.data, mimeType: image.mimeType, channelName });
-        return { description: "A screenshot showing an error dialog on the export screen." };
-      },
-    },
-    visionEnabledChannelIds: new Set(["C123"]),
     similarityDetector: {
       findSimilar: async (summary, categories, candidates) => {
         similarityCalls.push({ summary, categories, candidates });
@@ -95,7 +87,7 @@ function makeDeps() {
     similarityWindowDays: 30,
   };
   return {
-    deps, writes, appendedFlaggers, store, judgeCalls, downloadCalls, visionCalls, enrichCalls,
+    deps, writes, appendedFlaggers, store, judgeCalls, downloadCalls, enrichCalls,
     recentByCategoryCalls, similarityCalls,
     setRecentCandidates: (c: Array<{ pageId: string; summary: string }>) => { recentCandidates = c; },
   };
@@ -259,137 +251,65 @@ test("writes feedback without confidence/rationale when the judge returns null",
   assert.equal(writes[0].rationale, undefined);
 });
 
-test("describes an attached screenshot when the channel is vision-enabled", async () => {
-  const { deps, writes, downloadCalls, visionCalls } = makeDeps();
-  deps.slack.getMessage = async () => ({
-    text: "Getting this error, see screenshot",
-    authorUserId: "Uauthor",
-    imageUrls: ["https://files.slack.com/private/abc123"],
-  });
-  await handleCapture(req, deps);
-  assert.equal(writes[0].visualDescription, "A screenshot showing an error dialog on the export screen.");
-  assert.deepEqual(downloadCalls, ["https://files.slack.com/private/abc123"]);
-  assert.equal(visionCalls.length, 1);
-  assert.equal(visionCalls[0].data, "ZmFrZS1pbWFnZS1ieXRlcw==");
-  assert.equal(visionCalls[0].channelName, "#general");
-});
-
-test("does not attempt vision when the channel is not vision-enabled", async () => {
-  const { deps, writes, downloadCalls, visionCalls } = makeDeps();
-  deps.visionEnabledChannelIds = new Set(); // C123 (req.channelId) not included
-  deps.slack.getMessage = async () => ({
-    text: "Getting this error, see screenshot",
-    authorUserId: "Uauthor",
-    imageUrls: ["https://files.slack.com/private/abc123"],
-  });
-  await handleCapture(req, deps);
-  assert.equal(downloadCalls.length, 0);
-  assert.equal(visionCalls.length, 0);
-  assert.equal(writes[0].visualDescription, undefined);
-});
-
-test("does not attempt vision when the message has no image attachments", async () => {
-  const { deps, writes, downloadCalls, visionCalls } = makeDeps();
-  await handleCapture(req, deps); // default getMessage has no imageUrls
-  assert.equal(downloadCalls.length, 0);
-  assert.equal(visionCalls.length, 0);
-  assert.equal(writes[0].visualDescription, undefined);
-});
-
-test("writes feedback without visualDescription when the image download fails", async () => {
-  const { deps, writes } = makeDeps();
-  deps.slack.getMessage = async () => ({
-    text: "Getting this error, see screenshot",
-    authorUserId: "Uauthor",
-    imageUrls: ["https://files.slack.com/private/abc123"],
-  });
-  deps.slack.downloadImage = async () => { throw new Error("download failed"); };
-  const res = await handleCapture(req, deps);
-  assert.equal(res.status, "captured");
-  assert.equal(writes[0].visualDescription, undefined);
-});
-
-test("writes feedback without visualDescription when vision returns null", async () => {
-  const { deps, writes } = makeDeps();
-  deps.slack.getMessage = async () => ({
-    text: "Getting this error, see screenshot",
-    authorUserId: "Uauthor",
-    imageUrls: ["https://files.slack.com/private/abc123"],
-  });
-  deps.vision.describe = async () => null;
-  await handleCapture(req, deps);
-  assert.equal(writes[0].visualDescription, undefined);
-});
-
-test("attaches the downloaded screenshot to the feedback record when vision-enabled", async () => {
-  const { deps, writes } = makeDeps();
-  deps.slack.getMessage = async () => ({
-    text: "Getting this error, see screenshot",
-    authorUserId: "Uauthor",
-    imageUrls: ["https://files.slack.com/private/abc123"],
-  });
-  await handleCapture(req, deps);
-  assert.deepEqual(writes[0].image, { data: "ZmFrZS1pbWFnZS1ieXRlcw==", mimeType: "image/png" });
-});
-
-test("leaves the image unset when the channel is not vision-enabled", async () => {
-  const { deps, writes } = makeDeps();
-  deps.visionEnabledChannelIds = new Set(); // C123 (req.channelId) not included
-  deps.slack.getMessage = async () => ({
-    text: "see screenshot",
-    authorUserId: "Uauthor",
-    imageUrls: ["https://files.slack.com/private/abc123"],
-  });
-  await handleCapture(req, deps);
-  assert.equal(writes[0].image, undefined);
-});
-
-test("leaves the image unset when the message has no attachment", async () => {
-  const { deps, writes } = makeDeps();
-  await handleCapture(req, deps); // default getMessage has no imageUrls
-  assert.equal(writes[0].image, undefined);
-});
-
-test("leaves the image unset (but still captures) when the download fails", async () => {
-  const { deps, writes } = makeDeps();
-  deps.slack.getMessage = async () => ({
-    text: "see screenshot",
-    authorUserId: "Uauthor",
-    imageUrls: ["https://files.slack.com/private/abc123"],
-  });
-  deps.slack.downloadImage = async () => { throw new Error("download failed"); };
-  const res = await handleCapture(req, deps);
-  assert.equal(res.status, "captured");
-  assert.equal(writes[0].image, undefined);
-});
-
-test("feeds the vision description into what the enricher and judge see", async () => {
-  const { deps, enrichCalls, judgeCalls } = makeDeps();
-  deps.slack.getMessage = async () => ({
-    text: "Getting this error, see screenshot",
-    authorUserId: "Uauthor",
-    imageUrls: ["https://files.slack.com/private/abc123"],
-  });
-  await handleCapture(req, deps);
-  assert.equal(enrichCalls.length, 1);
-  assert.match(enrichCalls[0], /Getting this error, see screenshot/);
-  assert.match(enrichCalls[0], /A screenshot showing an error dialog on the export screen\./);
-  assert.match(judgeCalls[0].originalMessage, /A screenshot showing an error dialog on the export screen\./);
-});
-
-test("builds a clean enrichment input when there is no real text, only a screenshot", async () => {
+test("downloads all imageUrls and passes them to enricher", async () => {
   const { deps, enrichCalls } = makeDeps();
+  // Track images passed to enrich
+  const enrichImageArgs: any[] = [];
+  deps.enricher = {
+    async enrich(text, channelName, images) {
+      enrichCalls.push(text);
+      enrichImageArgs.push(images);
+      return { summary: "Summary.", categories: ["Feature Request" as FeedbackCategory] };
+    },
+  };
   deps.slack.getMessage = async () => ({
-    text: "",
+    text: "See this screenshot",
     authorUserId: "Uauthor",
-    imageUrls: ["https://files.slack.com/private/abc123"],
+    imageUrls: ["https://files.slack.com/private/img1", "https://files.slack.com/private/img2"],
   });
   await handleCapture(req, deps);
-  assert.match(enrichCalls[0], /A screenshot showing an error dialog on the export screen\./);
-  assert.doesNotMatch(enrichCalls[0], /no text — attachment or file/);
+  assert.ok(Array.isArray(enrichImageArgs[0]));
+  assert.strictEqual(enrichImageArgs[0].length, 2);
 });
 
-test("the raw Notion Message field is unaffected by the vision description", async () => {
+test("passes undefined images to enricher when message has no imageUrls", async () => {
+  const { deps } = makeDeps();
+  let capturedImages: any = "not-checked";
+  deps.enricher = {
+    async enrich(_text, _chan, images) {
+      capturedImages = images;
+      return { summary: "Summary.", categories: ["Feature Request" as FeedbackCategory] };
+    },
+  };
+  await handleCapture(req, deps); // default getMessage has no imageUrls
+  assert.strictEqual(capturedImages, undefined);
+});
+
+test("sets image on feedback record from first downloaded image", async () => {
+  const { deps, writes } = makeDeps();
+  deps.slack.getMessage = async () => ({
+    text: "See screenshot",
+    authorUserId: "Uauthor",
+    imageUrls: ["https://files.slack.com/private/img1"],
+  });
+  await handleCapture(req, deps);
+  assert.deepStrictEqual(writes[0].image, { data: "ZmFrZS1pbWFnZS1ieXRlcw==", mimeType: "image/png" });
+});
+
+test("captures without image when download fails (fail-open)", async () => {
+  const { deps, writes } = makeDeps();
+  deps.slack.getMessage = async () => ({
+    text: "See screenshot",
+    authorUserId: "Uauthor",
+    imageUrls: ["https://files.slack.com/private/img1"],
+  });
+  deps.slack.downloadImage = async () => { throw new Error("network error"); };
+  const res = await handleCapture(req, deps);
+  assert.strictEqual(res.status, "captured");
+  assert.strictEqual(writes[0].image, undefined);
+});
+
+test("the raw Notion Message field contains only the original Slack text", async () => {
   const { deps, writes } = makeDeps();
   deps.slack.getMessage = async () => ({
     text: "Getting this error, see screenshot",
@@ -397,7 +317,7 @@ test("the raw Notion Message field is unaffected by the vision description", asy
     imageUrls: ["https://files.slack.com/private/abc123"],
   });
   await handleCapture(req, deps);
-  assert.equal(writes[0].message, "Getting this error, see screenshot");
+  assert.strictEqual(writes[0].message, "Getting this error, see screenshot");
 });
 
 test("checks recent same-category candidates against the new summary", async () => {

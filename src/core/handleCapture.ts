@@ -98,10 +98,17 @@ export async function handleCapture(
 
     const dateIso = new Date(Number(req.messageTs) * 1000).toISOString().slice(0, 10);
 
-    const imageUrl = message.imageUrls?.[0];
-    const image = imageUrl ? await fetchImage(deps, imageUrl, logger) : null;
+    // Download all attached images and pass directly to the enricher as multimodal input.
+    // Each download failure is logged and skipped (fail-open).
+    const images: ImageAttachment[] = [];
+    if (message.imageUrls?.length) {
+      for (const url of message.imageUrls) {
+        const img = await fetchImage(deps, url, logger);
+        if (img) images.push(img);
+      }
+    }
 
-    let enrichment = await deps.enricher.enrich(text, channelName, image ? [image] : undefined).catch((err) => {
+    let enrichment = await deps.enricher.enrich(text, channelName, images.length ? images : undefined).catch((err) => {
       logger.warn("Enrichment failed — capturing without summary/category", { err: String(err) });
       return null;
     });
@@ -123,7 +130,7 @@ export async function handleCapture(
         judgeRationale: verdict.rationale,
       });
       const retryInput = `${text}\n\nNote: a previous classification of this message was rated Low confidence. Reviewer note: "${verdict.rationale}". Reconsider the category — pay particular attention to which category most precisely matches the primary signal.`;
-      const retryEnrichment = await deps.enricher.enrich(retryInput, channelName).catch((err) => {
+      const retryEnrichment = await deps.enricher.enrich(retryInput, channelName, images.length ? images : undefined).catch((err) => {
         logger.warn("Retry enrichment failed — keeping original result", { err: String(err) });
         return null;
       });
@@ -156,7 +163,7 @@ export async function handleCapture(
       aiSuggestedSummary: enrichment?.summary,
       confidence: verdict?.confidence,
       rationale: verdict?.rationale,
-      image: image ?? undefined,
+      image: images[0],
       relatedFeedbackPageId: relatedMatch?.matchedPageId,
       relatedFeedbackRationale: relatedMatch?.rationale,
       status: req.initialStatus,

@@ -53,7 +53,6 @@ export interface FeedbackRecord {
   aiSuggestedSummary?: string;
   confidence?: ConfidenceLevel;
   rationale?: string;
-  visualDescription?: string;
   image?: ImageAttachment;
   relatedFeedbackPageId?: string;
   relatedFeedbackRationale?: string;

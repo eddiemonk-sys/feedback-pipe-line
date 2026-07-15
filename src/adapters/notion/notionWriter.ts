@@ -68,9 +68,6 @@ export class NotionFeedbackWriter implements NotionWriter {
         ...(r.rationale
           ? { "Judge Rationale": { rich_text: [{ text: { content: r.rationale.slice(0, MAX_TEXT) } }] } }
           : {}),
-        ...(r.visualDescription
-          ? { "Visual Description": { rich_text: [{ text: { content: r.visualDescription.slice(0, MAX_TEXT) } }] } }
-          : {}),
         ...(imageUploadId
           ? { Image: { files: [{ type: "file_upload", file_upload: { id: imageUploadId }, name: "screenshot.png" }] } as any }
           : {}),
