@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { LLMToolCall } from "../../core/ports.js";
+import type { LLMToolCall, ImageAttachment } from "../../core/ports.js";
 
 export class OpenAILLMClient implements LLMToolCall {
   private client: OpenAI;
@@ -14,6 +14,7 @@ export class OpenAILLMClient implements LLMToolCall {
     tool: { name: string; description: string; inputSchema: Record<string, unknown> };
     temperature?: number;
     maxTokens: number;
+    images?: ImageAttachment[];
   }): Promise<Record<string, unknown> | null> {
     try {
       const response = await this.client.chat.completions.create({

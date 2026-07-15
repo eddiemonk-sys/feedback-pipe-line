@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { LLMToolCall } from "../../core/ports.js";
+import type { LLMToolCall, ImageAttachment } from "../../core/ports.js";
 
 export class AnthropicLLMClient implements LLMToolCall {
   private client: Anthropic;
@@ -14,14 +14,33 @@ export class AnthropicLLMClient implements LLMToolCall {
     tool: { name: string; description: string; inputSchema: Record<string, unknown> };
     temperature?: number;
     maxTokens: number;
+    images?: ImageAttachment[];
   }): Promise<Record<string, unknown> | null> {
     try {
+      // When images are present, build a multi-part content array (images first, then text).
+      // Anthropic performs best with image-before-text ordering in the content array.
+      const userContent: Anthropic.MessageParam["content"] = params.images?.length
+        ? [
+            ...params.images.map(
+              (img): Anthropic.ImageBlockParam => ({
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: img.mimeType as Anthropic.Base64ImageSource["media_type"],
+                  data: img.data,
+                },
+              }),
+            ),
+            { type: "text", text: params.userMessage },
+          ]
+        : params.userMessage;
+
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: params.maxTokens,
         ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
         system: params.system,
-        messages: [{ role: "user", content: params.userMessage }],
+        messages: [{ role: "user", content: userContent }],
         tools: [
           {
             name: params.tool.name,

@@ -113,6 +113,7 @@ export interface LLMToolCall {
     };
     temperature?: number;
     maxTokens: number;
+    images?: ImageAttachment[];
   }): Promise<Record<string, unknown> | null>;
 }
 
