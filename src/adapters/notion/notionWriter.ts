@@ -68,9 +68,6 @@ export class NotionFeedbackWriter implements NotionWriter {
         ...(r.rationale
           ? { "Judge Rationale": { rich_text: [{ text: { content: r.rationale.slice(0, MAX_TEXT) } }] } }
           : {}),
-        ...(imageUploadId
-          ? { Image: { files: [{ type: "file_upload", file_upload: { id: imageUploadId }, name: "screenshot.png" }] } as any }
-          : {}),
         ...(r.relatedFeedbackPageId
           ? { "Related Feedback": { relation: [{ id: r.relatedFeedbackPageId }] } }
           : {}),
@@ -83,6 +80,29 @@ export class NotionFeedbackWriter implements NotionWriter {
           : {}),
       },
     });
+
+    // Embed the uploaded image as an inline page block (requires "Insert content" integration permission).
+    // Fails open — a block append failure must never cause a capture loss.
+    if (imageUploadId) {
+      try {
+        await (this.client.blocks.children as any).append({
+          block_id: page.id,
+          children: [
+            {
+              type: "image",
+              image: {
+                type: "file_upload",
+                file_upload: { id: imageUploadId },
+              },
+            },
+          ],
+        });
+      } catch (err) {
+        // Log but do not rethrow — the page was created successfully
+        console.warn("[notionWriter] blocks.children.append failed (image not embedded):", err);
+      }
+    }
+
     return page.id;
   }
 
