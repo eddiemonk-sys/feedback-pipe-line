@@ -134,6 +134,7 @@ export async function handleCapture(
       : null;
 
     if (verdict?.confidence === "Low" && enrichment) {
+      const originalVerdict = verdict;
       logger.info("Low confidence — retrying enrichment", {
         key,
         firstCategories: enrichment.categories,
@@ -148,11 +149,11 @@ export async function handleCapture(
         const retryVerdict = await deps.judge
           .review(retryInput, channelName, retryEnrichment.summary, retryEnrichment.categories)
           .catch((err) => {
-            logger.warn("Retry judging failed", { err: String(err) });
+            logger.warn("Retry judging failed — keeping original verdict", { err: String(err) });
             return null;
           });
         enrichment = retryEnrichment;
-        verdict = retryVerdict;
+        verdict = retryVerdict ?? originalVerdict;
       }
     }
 
