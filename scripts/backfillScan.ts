@@ -11,8 +11,6 @@ import { Enricher } from "../src/adapters/enricher/claudeEnricher.js";
 import { loadGuideFile } from "../src/util/loadGuideFile.js";
 import { loadPrompt } from "../src/util/loadPrompt.js";
 import { NullEnricher } from "../src/adapters/enricher/nullEnricher.js";
-import { ClaudeVisionReader } from "../src/adapters/vision/claudeVisionReader.js";
-import { NullVisionReader } from "../src/adapters/vision/nullVisionReader.js";
 import { scanChannelHistory } from "../src/backfill/slackHistory.js";
 import { BackfillReviewDb } from "../src/backfill/reviewDb.js";
 import { uploadImageToNotion } from "../src/backfill/imageUpload.js";
@@ -34,8 +32,6 @@ async function main() {
   const gate = config.anthropicApiKey ? new FeedbackGate(new AnthropicLLMClient(config.anthropicApiKey, config.gateModel), loadPrompt("gate")) : new NullFeedbackGate();
   const enrichmentStyleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
   const enricher = config.anthropicApiKey ? new Enricher(new AnthropicLLMClient(config.anthropicApiKey, process.env.ENRICHER_MODEL ?? "claude-sonnet-4-6"), loadPrompt("enricher"), enrichmentStyleGuide) : new NullEnricher();
-  const vision = config.anthropicApiKey ? new ClaudeVisionReader(config.anthropicApiKey) : new NullVisionReader();
-  const visionChannels = new Set(config.visionEnabledChannelIds);
   const reviewDb = new BackfillReviewDb(notionApiKey);
 
   const oldest = Math.floor((Date.now() - config.backfillWeeksBack * 7 * 24 * 60 * 60 * 1000) / 1000);
@@ -50,7 +46,6 @@ async function main() {
   for (const channelId of config.backfillChannelIds) {
     try {
       const channelName = await slack.resolveChannelName(channelId);
-      const visionEnabled = visionChannels.has(channelId);
       logger.info(`\n=== ${channelName} (${channelId}) ===`);
       const raw = await scanChannelHistory((slack as any)["client"], channelId, oldest, { botUserId, triggerEmoji: config.triggerEmoji });
       logger.info(`Found ${raw.length} scannable message(s); running the gate...`);
@@ -58,26 +53,22 @@ async function main() {
       let kept = 0;
       for (const c of raw) {
         try {
-          // Vision first so image-only messages get a description the gate/enricher can use.
-          let visualDescription: string | undefined;
           let imageUploadId: string | undefined;
+          let enrichmentImages: { data: string; mimeType: string }[] | undefined;
           const imageUrl = c.imageUrls?.[0];
-          if (imageUrl && visionEnabled) {
+          if (imageUrl) {
             const img = await slack.downloadImage(imageUrl);
             if (img) {
-              visualDescription = (await vision.describe(img, channelName))?.description;
               imageUploadId = (await uploadImageToNotion(notionApiKey, img)) ?? undefined; // best-effort
+              enrichmentImages = [img];
             }
           }
-          const gateInput = visualDescription
-            ? (c.text.trim() ? `${c.text}\n\n[Attached screenshot shows: ${visualDescription}]` : `[Screenshot only. Shows: ${visualDescription}]`)
-            : c.text;
 
-          const verdict = await gate.classify(gateInput, channelName);
+          const verdict = await gate.classify(c.text, channelName);
           if (!verdict?.isLikelyFeedback) continue; // high recall, but skip clear non-feedback
           kept++;
 
-          const enrichment = await enricher.enrich(gateInput, channelName).catch(() => null);
+          const enrichment = await enricher.enrich(c.text, channelName, enrichmentImages).catch(() => null);
           const [authorName, slackUrl] = await Promise.all([
             slack.resolveUserName(c.user),
             slack.getPermalink(channelId, c.ts),
@@ -92,7 +83,6 @@ async function main() {
             slackUrl,
             proposedCategory: enrichment?.categories?.[0],
             proposedSummary: enrichment?.summary,
-            visualDescription,
             gateConfidence: verdict.confidence,
             gateRationale: verdict.rationale,
             imageUploadId,

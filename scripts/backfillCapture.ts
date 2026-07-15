@@ -13,8 +13,6 @@ import { loadPrompt } from "../src/util/loadPrompt.js";
 import { NullEnricher } from "../src/adapters/enricher/nullEnricher.js";
 import { Judge } from "../src/adapters/judge/claudeJudge.js";
 import { NullJudge } from "../src/adapters/judge/nullJudge.js";
-import { ClaudeVisionReader } from "../src/adapters/vision/claudeVisionReader.js";
-import { NullVisionReader } from "../src/adapters/vision/nullVisionReader.js";
 import { handleCapture, dedupKey, type CaptureDeps } from "../src/core/handleCapture.js";
 import { BackfillReviewDb } from "../src/backfill/reviewDb.js";
 import { toCaptureRequest, correctionFor } from "../src/backfill/decisions.js";
@@ -38,8 +36,6 @@ async function main() {
     slack, notion, dedup, logger, source: "Slack", botUserId,
     enricher: config.anthropicApiKey ? new Enricher(new AnthropicLLMClient(config.anthropicApiKey, process.env.ENRICHER_MODEL ?? "claude-sonnet-4-6"), loadPrompt("enricher"), enrichmentStyleGuide) : new NullEnricher(),
     judge: config.anthropicApiKey ? new Judge(new AnthropicLLMClient(config.anthropicApiKey, process.env.JUDGE_MODEL ?? "claude-sonnet-4-6"), loadPrompt("judge")) : new NullJudge(),
-    vision: config.anthropicApiKey ? new ClaudeVisionReader(config.anthropicApiKey) : new NullVisionReader(),
-    visionEnabledChannelIds: new Set(config.visionEnabledChannelIds),
   };
   const triggeredBy = config.backfillFlaggedByUserId ?? botUserId;
 
