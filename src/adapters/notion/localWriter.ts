@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
 import { mkdirSync, appendFileSync, readFileSync, existsSync } from "node:fs";
-import type { NotionWriter, FeedbackRecord, FeedbackCategory } from "../../core/ports.js";
+import type { NotionWriter, FeedbackRecord, FeedbackCategory, ImageAttachment } from "../../core/ports.js";
 import type { Logger } from "../../util/logger.js";
 
 let localIdSeq = 0;
@@ -73,5 +73,31 @@ export class LocalFeedbackWriter implements NotionWriter {
     });
     appendFileSync(this.filePath, line + "\n", "utf8");
     this.logger.info("Sibling links updated (local)", { pageId, siblingCount: siblingPageIds.length });
+  }
+
+  async getPageSummaries(
+    pageIds: string[],
+  ): Promise<Array<{ pageId: string; summary: string; preambleContext?: string }>> {
+    // Local writer can't look up by page ID — return empty (thread routing will route to all)
+    return [];
+  }
+
+  async updateSummaryAndLog(
+    pageId: string,
+    replyText: string,
+    replyAuthorName: string,
+    replyTs: string,
+    _images?: ImageAttachment[],
+  ): Promise<void> {
+    const line = JSON.stringify({
+      capturedAt: new Date().toISOString(),
+      event: "thread_log_appended",
+      pageId,
+      replyAuthorName,
+      replyTs,
+      replyText,
+    });
+    appendFileSync(this.filePath, line + "\n", "utf8");
+    this.logger.info("Thread log appended (local)", { pageId });
   }
 }

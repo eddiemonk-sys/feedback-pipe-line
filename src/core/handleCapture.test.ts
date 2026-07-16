@@ -60,6 +60,8 @@ function makeDeps() {
         return recentCandidates;
       },
       updateSiblingLinks: async (_pageId: string, _siblingPageIds: string[]) => {},
+      updateSummaryAndLog: async () => {},
+      getPageSummaries: async () => [],
     },
     slack: {
       getMessage: async () => ({ text: "Customers keep asking for SSO", authorUserId: "Uauthor" }),

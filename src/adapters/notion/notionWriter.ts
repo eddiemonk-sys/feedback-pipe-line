@@ -1,5 +1,5 @@
 import { Client } from "@notionhq/client";
-import type { NotionWriter, FeedbackRecord, FeedbackCategory } from "../../core/ports.js";
+import type { NotionWriter, FeedbackRecord, FeedbackCategory, ImageAttachment } from "../../core/ports.js";
 import { uploadImageToNotion } from "../../backfill/imageUpload.js";
 
 /** Notion caps a single text content value at 2000 characters. */
@@ -180,6 +180,75 @@ export class NotionFeedbackWriter implements NotionWriter {
         },
       },
     });
+  }
+
+  async getPageSummaries(
+    pageIds: string[],
+  ): Promise<Array<{ pageId: string; summary: string; preambleContext?: string }>> {
+    const results: Array<{ pageId: string; summary: string; preambleContext?: string }> = [];
+    await Promise.all(
+      pageIds.map(async (pageId) => {
+        try {
+          const page = await this.client.pages.retrieve({ page_id: pageId });
+          const props = (page as any).properties as Record<string, any>;
+          const summary: string = props["Summary"]?.rich_text?.[0]?.plain_text ?? "";
+          if (!summary) return; // skip rows without a summary
+          const preambleContext: string | undefined =
+            props["Preamble Context"]?.rich_text?.[0]?.plain_text || undefined;
+          results.push({ pageId, summary, preambleContext });
+        } catch {
+          // fail-open: skip pages that can't be retrieved
+        }
+      }),
+    );
+    return results;
+  }
+
+  async updateSummaryAndLog(
+    pageId: string,
+    replyText: string,
+    replyAuthorName: string,
+    replyTs: string,
+    images?: ImageAttachment[],
+  ): Promise<void> {
+    const timestamp = new Date(Number(replyTs) * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC";
+    const logEntry = `[${timestamp}] ${replyAuthorName}: ${replyText}`.slice(0, MAX_TEXT);
+
+    // Append the thread log as a quote block
+    await (this.client.blocks.children as any).append({
+      block_id: pageId,
+      children: [
+        {
+          type: "quote",
+          quote: {
+            rich_text: [{ type: "text", text: { content: logEntry } }],
+          },
+        },
+      ],
+    });
+
+    // Append any reply images as inline image blocks
+    if (images?.length) {
+      const imageUploadIds = await Promise.all(
+        images.map(async (img) => {
+          try {
+            return await uploadImageToNotion(this.apiKey, img);
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const validIds = imageUploadIds.filter((id): id is string => id !== null);
+      if (validIds.length > 0) {
+        await (this.client.blocks.children as any).append({
+          block_id: pageId,
+          children: validIds.map((id) => ({
+            type: "image",
+            image: { type: "file_upload", file_upload: { id } },
+          })),
+        });
+      }
+    }
   }
 
   /**
