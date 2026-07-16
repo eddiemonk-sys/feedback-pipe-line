@@ -181,7 +181,8 @@ async function evalEnricher(config: EvalConfig) {
   for (const cat of CATEGORIES) perCat[cat] = { correct: 0, total: 0 };
 
   for (const { row, gold } of evalRows) {
-    const result = await enricher.enrich(row["message"], "eval");
+    const resultArray = await enricher.enrich(row["message"], "eval");
+    const result = resultArray?.[0] ?? null; // Take first result (non-split case)
     const primaryPredicted = result?.categories[0] ?? null;
     const primaryGold = gold![0];
     const match = primaryPredicted !== null && gold!.includes(primaryPredicted);
