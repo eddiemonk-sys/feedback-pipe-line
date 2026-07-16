@@ -80,6 +80,27 @@ export interface NotionWriter {
    * Called in pass 2 after all child rows are created. Fails open — caller logs and continues.
    */
   updateSiblingLinks(pageId: string, siblingPageIds: string[]): Promise<void>;
+
+  /**
+   * Appends a timestamped thread log block to the Notion page body for this reply.
+   * Fails open — a block append failure must never surface as a capture error.
+   */
+  updateSummaryAndLog(
+    pageId: string,
+    replyText: string,
+    replyAuthorName: string,
+    replyTs: string,
+    images?: ImageAttachment[],
+  ): Promise<void>;
+
+  /**
+   * Fetch the summary and preamble context for a set of page IDs.
+   * Used to build the candidates array for ThreadRouter.route().
+   * Returns only pages that have a Summary property set.
+   */
+  getPageSummaries(
+    pageIds: string[],
+  ): Promise<Array<{ pageId: string; summary: string; preambleContext?: string }>>;
 }
 
 /** Dedup store keyed on a stable message key (channelId:messageTs). */
@@ -209,4 +230,25 @@ export interface SimilarityDetector {
  */
 export interface FeedbackGate {
   classify(text: string, channelName: string): Promise<FeedbackGateResult | null>;
+}
+
+export interface ThreadRouterResult {
+  /** The page ID of the row this reply is relevant to. */
+  pageId: string;
+  /** "primary" if the reply directly addresses this row; "secondary" if tangentially relevant. */
+  relevance: "primary" | "secondary";
+  /** One sentence explaining why this row matches. */
+  rationale: string;
+}
+
+/**
+ * Routes a thread reply to the Notion row(s) it most likely addresses.
+ * Returns [] on any failure (fail-open). Never throws.
+ */
+export interface ThreadRouter {
+  route(
+    replyText: string,
+    replyImages: ImageAttachment[],
+    candidates: Array<{ pageId: string; summary: string; preambleContext?: string }>,
+  ): Promise<ThreadRouterResult[]>;
 }
