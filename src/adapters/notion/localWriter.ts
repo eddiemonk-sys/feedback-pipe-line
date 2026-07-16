@@ -63,4 +63,15 @@ export class LocalFeedbackWriter implements NotionWriter {
 
     return candidates;
   }
+
+  async updateSiblingLinks(pageId: string, siblingPageIds: string[]): Promise<void> {
+    const line = JSON.stringify({
+      capturedAt: new Date().toISOString(),
+      event: "sibling_links_updated",
+      pageId,
+      siblingPageIds,
+    });
+    appendFileSync(this.filePath, line + "\n", "utf8");
+    this.logger.info("Sibling links updated (local)", { pageId, siblingCount: siblingPageIds.length });
+  }
 }

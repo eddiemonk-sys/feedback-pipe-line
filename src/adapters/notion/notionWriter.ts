@@ -78,6 +78,15 @@ export class NotionFeedbackWriter implements NotionWriter {
               },
             }
           : {}),
+        ...(r.sourceMessageKey
+          ? { "Source Message Key": { rich_text: [{ text: { content: r.sourceMessageKey.slice(0, MAX_TEXT) } }] } }
+          : {}),
+        ...(r.preambleContext
+          ? { "Preamble Context": { rich_text: [{ text: { content: r.preambleContext.slice(0, MAX_TEXT) } }] } }
+          : {}),
+        ...(r.mentionedUsers?.length
+          ? { "Mentioned Users": { rich_text: [{ text: { content: r.mentionedUsers.join(", ").slice(0, MAX_TEXT) } }] } }
+          : {}),
       },
     });
 
@@ -159,6 +168,18 @@ export class NotionFeedbackWriter implements NotionWriter {
         summary: (page.properties?.["Summary"]?.rich_text?.[0]?.plain_text as string) ?? "",
       }))
       .filter((c: { summary: string }) => c.summary);
+  }
+
+  async updateSiblingLinks(pageId: string, siblingPageIds: string[]): Promise<void> {
+    if (siblingPageIds.length === 0) return;
+    await this.client.pages.update({
+      page_id: pageId,
+      properties: {
+        Siblings: {
+          relation: siblingPageIds.map((id) => ({ id })),
+        },
+      },
+    });
   }
 
   /**

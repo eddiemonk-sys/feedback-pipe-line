@@ -50,6 +50,7 @@ function makeDeps() {
         recentByCategoryCalls.push({ categories, sinceDateIso });
         return recentCandidates;
       },
+      updateSiblingLinks: async (_pageId, _siblingPageIds) => {},
     },
     slack: {
       getMessage: async () => ({ text: "Customers keep asking for SSO", authorUserId: "Uauthor" }),
