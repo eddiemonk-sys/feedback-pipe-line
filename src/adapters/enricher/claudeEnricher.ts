@@ -29,52 +29,105 @@ export class Enricher implements EnricherPort {
     this.systemPrompt = appendGuidance(systemPrompt ?? DEFAULT_SYSTEM_PROMPT, styleGuide);
   }
 
-  async enrich(text: string, channelName: string, images?: ImageAttachment[]): Promise<EnrichmentResult | null> {
+  async enrich(text: string, channelName: string, images?: ImageAttachment[]): Promise<EnrichmentResult[] | null> {
     const input = await this.llmClient.complete({
       system: this.systemPrompt,
       userMessage: `Channel: ${channelName}\nMessage: ${text}`,
       tool: {
         name: "submit_enrichment",
-        description: "Submit the classification for this feedback message. Fill reasoning first, then summary and categories.",
+        description: "Submit the classification for this feedback message. If the message contains multiple distinct feedback items (different root causes, categories, or owners), output one entry per item in the results array. For a single-item message, output a results array with exactly one entry.",
         inputSchema: {
           type: "object",
           properties: {
-            reasoning: {
-              type: "string",
-              description: "1-2 sentences: which signals in the message drove your category choice, and why you ruled out the closest alternative.",
-            },
-            summary: {
-              type: "string",
-              description: "1-2 sentence plain-English summary of the feedback",
-            },
-            categories: {
+            results: {
               type: "array",
-              items: { type: "string", enum: CATEGORIES },
               minItems: 1,
-              maxItems: 2,
-              description: "1 or 2 categories that best fit this feedback. Use 2 only when the message genuinely spans two distinct areas.",
+              description: "One entry per distinct feedback item. Usually 1. Multiple entries only when items have genuinely different root causes, categories, or owners.",
+              items: {
+                type: "object",
+                properties: {
+                  reasoning: {
+                    type: "string",
+                    description: "1-2 sentences: which signals drove your category choice and why you ruled out the closest alternative.",
+                  },
+                  summary: {
+                    type: "string",
+                    description: "Structured summary: one lead sentence (most important point first, include client name and deadline if stated), then 2-4 bullets (•) for each distinct detail. Dates MUST appear verbatim as their own bullet.",
+                  },
+                  categories: {
+                    type: "array",
+                    items: { type: "string", enum: CATEGORIES },
+                    minItems: 1,
+                    maxItems: 2,
+                    description: "1 or 2 categories. Use 2 only when the message genuinely spans two distinct areas.",
+                  },
+                  preambleContext: {
+                    type: "string",
+                    description: "Optional. The framing text from the message header (e.g. 'Call notes from DTG:'), if present. Propagated to every item in this split.",
+                  },
+                  clientName: {
+                    type: "string",
+                    description: "Optional. Explicitly stated account or client name from the preamble. NEVER infer — only set if the name is stated in the text.",
+                  },
+                  mentionedUsers: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Optional. @mention display names within THIS item's bullet (not preamble-level mentions).",
+                  },
+                  imageIndices: {
+                    type: "array",
+                    items: { type: "number" },
+                    description: "Optional. Zero-based indices of images (from the message) that explicitly reference this item. Leave absent if attribution is ambiguous.",
+                  },
+                },
+                required: ["reasoning", "summary", "categories"],
+              },
             },
           },
-          required: ["reasoning", "summary", "categories"],
+          required: ["results"],
         },
       },
       temperature: 0,
-      maxTokens: 2048,
+      maxTokens: 4096,
       images,
     });
 
     if (!input) return null;
 
-    const { summary, categories } = input as { reasoning: string; summary: string; categories: string[] };
-    if (
-      !summary ||
-      !Array.isArray(categories) ||
-      categories.length < 1 ||
-      categories.length > 2 ||
-      !categories.every((c) => CATEGORIES.includes(c as FeedbackCategory))
-    )
-      return null;
+    const { results } = input as { results: Array<{
+      reasoning: string;
+      summary: string;
+      categories: string[];
+      preambleContext?: string;
+      clientName?: string;
+      mentionedUsers?: string[];
+      imageIndices?: number[];
+    }> };
 
-    return { summary, categories: categories as FeedbackCategory[] };
+    if (!Array.isArray(results) || results.length === 0) return null;
+
+    const enrichments: EnrichmentResult[] = [];
+    for (const item of results) {
+      const { summary, categories, preambleContext, clientName, mentionedUsers, imageIndices } = item;
+      if (
+        !summary ||
+        !Array.isArray(categories) ||
+        categories.length < 1 ||
+        categories.length > 2 ||
+        !categories.every((c) => CATEGORIES.includes(c as FeedbackCategory))
+      )
+        return null; // one invalid item invalidates the whole batch
+
+      enrichments.push({
+        summary,
+        categories: categories as FeedbackCategory[],
+        ...(preambleContext ? { preambleContext } : {}),
+        ...(clientName ? { clientName } : {}),
+        ...(mentionedUsers?.length ? { mentionedUsers } : {}),
+        ...(imageIndices?.length ? { imageIndices } : {}),
+      });
+    }
+
+    return enrichments;
   }
 }

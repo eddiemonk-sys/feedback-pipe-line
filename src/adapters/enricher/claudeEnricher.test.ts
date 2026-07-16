@@ -24,28 +24,63 @@ test("Enricher — returns null when LLMToolCall returns null", async () => {
   assert.strictEqual(result, null);
 });
 
-test("Enricher — returns EnrichmentResult on valid tool output", async () => {
+test("Enricher — returns array with one result on valid tool output (non-split)", async () => {
   const enricher = new Enricher(
     makeMockLLMClient({
-      reasoning: "Clear feature request signal.",
-      summary: "User wants SSO integration.",
-      categories: ["Feature Request"],
+      results: [{
+        reasoning: "Clear feature request signal.",
+        summary: "User wants SSO integration.",
+        categories: ["Feature Request"],
+      }],
     }),
   );
   const result = await enricher.enrich("Please add SSO support", "#general");
-  assert.ok(result !== null);
-  assert.strictEqual(result.summary, "User wants SSO integration.");
-  assert.deepStrictEqual(result.categories, ["Feature Request"]);
+  assert.ok(Array.isArray(result));
+  assert.strictEqual(result!.length, 1);
+  assert.strictEqual(result![0].summary, "User wants SSO integration.");
+  assert.deepStrictEqual(result![0].categories, ["Feature Request"]);
+});
+
+test("Enricher — returns multiple results on batch split", async () => {
+  const enricher = new Enricher(
+    makeMockLLMClient({
+      results: [
+        {
+          reasoning: "First distinct item.",
+          summary: "Bug with export.",
+          categories: ["Bug / Broken"],
+          preambleContext: "Notes from DTG call:",
+          clientName: "DTG",
+        },
+        {
+          reasoning: "Second distinct item.",
+          summary: "Feature request for SSO.",
+          categories: ["Feature Request"],
+          preambleContext: "Notes from DTG call:",
+          clientName: "DTG",
+        },
+      ],
+    }),
+  );
+  const result = await enricher.enrich("Notes from DTG call:\n• Bug...\n• SSO...", "#general");
+  assert.ok(Array.isArray(result));
+  assert.strictEqual(result!.length, 2);
+  assert.strictEqual(result![0].clientName, "DTG");
+  assert.strictEqual(result![1].clientName, "DTG");
 });
 
 test("Enricher — returns null when categories are invalid", async () => {
   const enricher = new Enricher(
     makeMockLLMClient({
-      reasoning: "...",
-      summary: "Test.",
-      categories: ["NotARealCategory"],
+      results: [{ reasoning: "...", summary: "Test.", categories: ["NotARealCategory"] }],
     }),
   );
+  const result = await enricher.enrich("test", "#general");
+  assert.strictEqual(result, null);
+});
+
+test("Enricher — returns null when results array is missing or empty", async () => {
+  const enricher = new Enricher(makeMockLLMClient({ results: [] }));
   const result = await enricher.enrich("test", "#general");
   assert.strictEqual(result, null);
 });
@@ -62,9 +97,11 @@ test("Enricher — passes images to LLMToolCall when provided", async () => {
     async complete(params) {
       capturedParams.push(params);
       return {
-        reasoning: "Feature request signal.",
-        summary: "User wants SSO integration.",
-        categories: ["Feature Request"],
+        results: [{
+          reasoning: "Feature request signal.",
+          summary: "User wants SSO integration.",
+          categories: ["Feature Request"],
+        }],
       };
     },
   };
@@ -81,9 +118,11 @@ test("Enricher — omits images from LLMToolCall when not provided", async () =>
     async complete(params) {
       capturedParams.push(params);
       return {
-        reasoning: "Feature request signal.",
-        summary: "User wants SSO integration.",
-        categories: ["Feature Request"],
+        results: [{
+          reasoning: "Feature request signal.",
+          summary: "User wants SSO integration.",
+          categories: ["Feature Request"],
+        }],
       };
     },
   };
