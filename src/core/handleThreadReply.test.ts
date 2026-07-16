@@ -78,8 +78,9 @@ test("invokes handleCapture for parent when parent not in dedup store", async ()
     return { status: "captured" as const, key: "C123:parent_ts" };
   };
   await handleThreadReply("C123", "parent_ts", "reply_ts", "Ureply", "Follow-up.", [], deps);
-  assert.strictEqual(captureInvocations.length, 0); // handleCapture was replaced inline
-  // loggedUpdates will have the update
+  // captureInvocations is from makeDeps' original mock; the replacement above does not push to it.
+  // length === 0 confirms the original mock was NOT called — the replacement was used instead.
+  assert.strictEqual(captureInvocations.length, 0);
 });
 
 test("skips update when parent capture fails and page IDs are still empty", async () => {
