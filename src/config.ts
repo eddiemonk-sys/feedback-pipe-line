@@ -19,6 +19,8 @@ export interface Config {
   judgeModel: string;
   /** Model name for the gate stage. Provider detected from prefix (claude-* / gpt-*). */
   gateModel: string;
+  /** Model for the thread router. Defaults to the enricher model. */
+  threadRouterModel: string;
   /** Channels where screenshots may be sent to Claude vision. Empty = disabled everywhere (fail closed). */
   visionEnabledChannelIds: string[];
   /** How far back to look for a possible duplicate when checking for related feedback. */
@@ -68,6 +70,7 @@ export function loadConfig(): Config {
     enricherModel: (process.env.ENRICHER_MODEL ?? "claude-sonnet-4-6").trim(),
     judgeModel: (process.env.JUDGE_MODEL ?? "claude-sonnet-4-6").trim(),
     gateModel: (process.env.GATE_MODEL ?? "claude-haiku-4-5-20251001").trim(),
+    threadRouterModel: (process.env.THREAD_ROUTER_MODEL ?? process.env.ENRICHER_MODEL ?? "claude-sonnet-4-6").trim(),
     visionEnabledChannelIds: (process.env.VISION_ENABLED_CHANNEL_IDS ?? "")
       .split(",")
       .map((s) => s.trim())

@@ -9,6 +9,17 @@ export interface SocketModeOptions {
   appToken: string;
   /** Emoji name (no colons) that triggers a capture, e.g. "mega". */
   triggerEmoji: string;
+  /** Called for each non-bot thread reply in a channel the bot is in. */
+  onThreadReply?: (
+    channelId: string,
+    threadTs: string,
+    replyTs: string,
+    replyUserId: string,
+    replyText: string,
+    replyImageUrls: string[],
+  ) => Promise<void>;
+  /** Bot's own user ID — used to filter out the bot's own ack replies (R6 loop prevention). */
+  botUserId?: string;
 }
 
 /**
@@ -70,6 +81,34 @@ export async function startSocketMode(
       logger.error("onCapture threw (mention)", { err: String(err) });
     }
   });
+
+  if (options.onThreadReply) {
+    app.event("message", async ({ event }: any) => {
+      // Filter: only thread replies that are NOT from the bot itself (R6 loop prevention)
+      if (!event.thread_ts || event.thread_ts === event.ts) return;  // not a thread reply
+      if (event.bot_id) return;  // ignore bot messages (including our own acks)
+      if (options.botUserId && event.user === options.botUserId) return;  // extra safety
+      if (!event.text && !event.files?.length) return;  // no content
+
+      const replyImageUrls: string[] = (event.files ?? [])
+        .filter((f: any) => f.mimetype?.startsWith("image/"))
+        .map((f: any) => f.url_private as string)
+        .filter(Boolean);
+
+      try {
+        await options.onThreadReply!(
+          event.channel,
+          event.thread_ts,
+          event.ts,
+          event.user ?? "",
+          event.text ?? "",
+          replyImageUrls,
+        );
+      } catch (err) {
+        logger.error("onThreadReply threw", { err: String(err) });
+      }
+    });
+  }
 
   await app.start();
   logger.info(

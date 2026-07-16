@@ -1,3 +1,4 @@
 gate: v4
 enricher: v15
 judge: v4
+threadRouter: v1

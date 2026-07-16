@@ -16,8 +16,11 @@ import { NullJudge } from "./adapters/judge/nullJudge.js";
 import { ClaudeSimilarityDetector } from "./adapters/similarity/claudeSimilarityDetector.js";
 import { NullSimilarityDetector } from "./adapters/similarity/nullSimilarityDetector.js";
 import { handleCapture, type CaptureDeps, type CaptureResult } from "./core/handleCapture.js";
+import { handleThreadReply, type ThreadReplyDeps } from "./core/handleThreadReply.js";
 import type { CaptureRequest } from "./core/events.js";
-import type { Enricher, Judge, SimilarityDetector, SlackGateway, NotionWriter, LLMToolCall } from "./core/ports.js";
+import type { Enricher, Judge, SimilarityDetector, SlackGateway, NotionWriter, LLMToolCall, ThreadRouter } from "./core/ports.js";
+import { ClaudeThreadRouter } from "./adapters/threadRouter/claudeThreadRouter.js";
+import { NullThreadRouter } from "./adapters/threadRouter/nullThreadRouter.js";
 
 const SUCCESS_EMOJI = "white_check_mark";
 const FAILURE_EMOJI = "warning";
@@ -124,6 +127,19 @@ async function main(): Promise<void> {
       : "Related-feedback detection disabled — set ANTHROPIC_API_KEY to enable",
   );
 
+  const threadRouterPrompt = loadPrompt("threadRouter");
+  const threadRouter: ThreadRouter = hasLLMKey && config.anthropicApiKey
+    ? new ClaudeThreadRouter(
+        makeLLMClient(config.threadRouterModel, config.anthropicApiKey ?? config.openaiApiKey!),
+        threadRouterPrompt ?? "",
+      )
+    : new NullThreadRouter();
+  logger.info(
+    hasLLMKey
+      ? `Thread routing enabled (${config.threadRouterModel})`
+      : "Thread routing disabled — set ANTHROPIC_API_KEY to enable",
+  );
+
   const deps: CaptureDeps = {
     slack,
     notion: feedbackWriter,
@@ -144,11 +160,34 @@ async function main(): Promise<void> {
     await acknowledge(slack, req, result);
   };
 
+  const threadReplyDeps: ThreadReplyDeps = {
+    slack,
+    notion: feedbackWriter,
+    dedup,
+    logger,
+    threadRouter,
+    handleCapture,  // the fully-wired function from above
+    captureDeps: deps,
+  };
+
+  const onThreadReply = async (
+    channelId: string,
+    threadTs: string,
+    replyTs: string,
+    replyUserId: string,
+    replyText: string,
+    replyImageUrls: string[],
+  ): Promise<void> => {
+    await handleThreadReply(channelId, threadTs, replyTs, replyUserId, replyText, replyImageUrls, threadReplyDeps);
+  };
+
   await startSocketMode(
     {
       botToken: config.slackBotToken,
       appToken: config.slackAppToken,
       triggerEmoji: config.triggerEmoji,
+      onThreadReply,
+      botUserId,
     },
     onCapture,
     logger,
