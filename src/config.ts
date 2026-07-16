@@ -4,7 +4,7 @@ export type CaptureSink = "notion" | "file";
 
 export interface Config {
   slackBotToken: string;
-  slackAppToken: string;
+  slackSigningSecret: string;
   captureSink: CaptureSink;
   notionApiKey?: string;
   notionDatabaseId?: string;
@@ -58,7 +58,7 @@ export function loadConfig(): Config {
 
   const config: Config = {
     slackBotToken: required("SLACK_BOT_TOKEN"),
-    slackAppToken: required("SLACK_APP_TOKEN"),
+    slackSigningSecret: required("SLACK_SIGNING_SECRET"),
     captureSink,
     notionApiKey: optional("NOTION_API_KEY"),
     notionDatabaseId: optional("NOTION_DATABASE_ID"),

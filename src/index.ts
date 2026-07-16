@@ -6,7 +6,7 @@ import { BoltSlackGateway } from "./adapters/slack/boltGateway.js";
 import { NotionFeedbackWriter } from "./adapters/notion/notionWriter.js";
 import { LocalFeedbackWriter } from "./adapters/notion/localWriter.js";
 import { FileDedupStore } from "./adapters/dedup/fileStore.js";
-import { startSocketMode } from "./adapters/transport/socketMode.js";
+import { startHttpMode } from "./adapters/transport/httpMode.js";
 import { AnthropicLLMClient } from "./adapters/llm/anthropicClient.js";
 import { OpenAILLMClient } from "./adapters/llm/openaiClient.js";
 import { Enricher as EnricherImpl } from "./adapters/enricher/claudeEnricher.js";
@@ -181,10 +181,10 @@ async function main(): Promise<void> {
     await handleThreadReply(channelId, threadTs, replyTs, replyUserId, replyText, replyImageUrls, threadReplyDeps);
   };
 
-  await startSocketMode(
+  await startHttpMode(
     {
       botToken: config.slackBotToken,
-      appToken: config.slackAppToken,
+      signingSecret: config.slackSigningSecret,
       triggerEmoji: config.triggerEmoji,
       onThreadReply,
       botUserId,
