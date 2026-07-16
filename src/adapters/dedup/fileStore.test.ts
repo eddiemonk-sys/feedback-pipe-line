@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FileDedupStore } from "./fileStore.js";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -36,16 +36,14 @@ test("FileDedupStore — getPageIds returns [] for missing key", () => {
 });
 
 test("FileDedupStore — getPageIds returns [] for null legacy entry", () => {
-  const { store, cleanup } = makeTempStore();
+  const dir = mkdtempSync(join(tmpdir(), "dedup-test-"));
+  const path = join(dir, "dedup.json");
   try {
-    // Simulate a legacy null entry by using the internal store
-    store.record("C1:ts1", "tmp");
-    // Override with null by checking getPageId
-    // Directly test: record a key normally, then check backward compat
-    const ids = store.getPageIds("C1:ts1");
-    assert.ok(Array.isArray(ids));
-    assert.strictEqual(ids.length, 1);
-  } finally { cleanup(); }
+    // Write a raw JSON file with a null entry to simulate legacy data
+    writeFileSync(path, JSON.stringify({ "C1:ts1": null }), "utf8");
+    const store = new FileDedupStore(path);
+    assert.deepStrictEqual(store.getPageIds("C1:ts1"), []);
+  } finally { rmSync(dir, { recursive: true }); }
 });
 
 test("FileDedupStore — getPageId still works for single-entry (backward compat)", () => {

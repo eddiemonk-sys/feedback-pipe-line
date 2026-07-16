@@ -102,7 +102,7 @@ export class FileDedupStore implements DedupStore {
 
   findKeyByPageId(pageId: string): string | null {
     for (const [k, v] of this.store) {
-      if (v === pageId) return k;
+      if (Array.isArray(v) ? v.includes(pageId) : v === pageId) return k;
     }
     return null;
   }
