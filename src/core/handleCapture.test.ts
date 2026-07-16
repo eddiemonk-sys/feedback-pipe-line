@@ -36,6 +36,15 @@ function makeDeps() {
         for (const [k, v] of store) { if (v === pageId) return k; }
         return null;
       },
+      recordMultiple: (k: string, pageIds: string[]) => {
+        // Store all page IDs (simple representation for tests)
+        for (const id of pageIds) store.set(k, id); // simplified for existing tests
+      },
+      getPageIds: (k: string) => {
+        const v = store.get(k);
+        if (!v) return [];
+        return [v];
+      },
       close: () => {},
     },
     notion: {
@@ -50,7 +59,7 @@ function makeDeps() {
         recentByCategoryCalls.push({ categories, sinceDateIso });
         return recentCandidates;
       },
-      updateSiblingLinks: async (_pageId, _siblingPageIds) => {},
+      updateSiblingLinks: async (_pageId: string, _siblingPageIds: string[]) => {},
     },
     slack: {
       getMessage: async () => ({ text: "Customers keep asking for SSO", authorUserId: "Uauthor" }),
@@ -67,10 +76,10 @@ function makeDeps() {
     enricher: {
       enrich: async (text, _channelName, _images) => {
         enrichCalls.push(text);
-        return {
+        return [{
           summary: "Customer wants SSO integration.",
           categories: ["Feature Request" as FeedbackCategory],
-        };
+        }];
       },
     },
     judge: {
@@ -260,7 +269,7 @@ test("downloads all imageUrls and passes them to enricher", async () => {
     async enrich(text, channelName, images) {
       enrichCalls.push(text);
       enrichImageArgs.push(images);
-      return { summary: "Summary.", categories: ["Feature Request" as FeedbackCategory] };
+      return [{ summary: "Summary.", categories: ["Feature Request" as FeedbackCategory] }];
     },
   };
   deps.slack.getMessage = async () => ({
@@ -279,7 +288,7 @@ test("passes undefined images to enricher when message has no imageUrls", async 
   deps.enricher = {
     async enrich(_text, _chan, images) {
       capturedImages = images;
-      return { summary: "Summary.", categories: ["Feature Request" as FeedbackCategory] };
+      return [{ summary: "Summary.", categories: ["Feature Request" as FeedbackCategory] }];
     },
   };
   await handleCapture(req, deps); // default getMessage has no imageUrls
@@ -396,10 +405,10 @@ test("handleCapture — retries enrichment when judge returns Low confidence", a
     enrich: async (text) => {
       enrichCalls.push(text);
       enrichCallCount++;
-      return {
+      return [{
         summary: enrichCallCount === 1 ? "Original summary." : "Retry summary.",
         categories: ["Feature Request" as FeedbackCategory],
-      };
+      }];
     },
   };
 
@@ -425,7 +434,7 @@ test("handleCapture — keeps original enrichment when retry enrichment fails", 
   deps.enricher = {
     enrich: async () => {
       enrichCallCount++;
-      if (enrichCallCount === 1) return { summary: "Original.", categories: ["Feature Request" as FeedbackCategory] };
+      if (enrichCallCount === 1) return [{ summary: "Original.", categories: ["Feature Request" as FeedbackCategory] }];
       return null; // retry fails
     },
   };
@@ -447,7 +456,7 @@ test("handleCapture — does NOT retry when judge returns Medium", async () => {
     enrich: async (text) => {
       enrichCalls.push(text);
       enrichCallCount++;
-      return { summary: "Summary.", categories: ["Feature Request" as FeedbackCategory] };
+      return [{ summary: "Summary.", categories: ["Feature Request" as FeedbackCategory] }];
     },
   };
 
@@ -455,4 +464,150 @@ test("handleCapture — does NOT retry when judge returns Medium", async () => {
 
   // enricher called only once — no retry for Medium
   assert.strictEqual(enrichCalls.length, 1);
+});
+
+test("batch split — creates one Notion row per enrichment result", async () => {
+  const { deps, writes } = makeDeps();
+  deps.enricher = {
+    async enrich() {
+      return [
+        { summary: "Item 1: bug.", categories: ["Bug / Broken" as FeedbackCategory], clientName: "DTG", preambleContext: "DTG call:" },
+        { summary: "Item 2: feature.", categories: ["Feature Request" as FeedbackCategory], clientName: "DTG", preambleContext: "DTG call:" },
+      ];
+    },
+  };
+  await handleCapture(req, deps);
+  assert.strictEqual(writes.length, 2);
+  assert.strictEqual(writes[0].summary, "Item 1: bug.");
+  assert.strictEqual(writes[1].summary, "Item 2: feature.");
+});
+
+test("batch split — sets customerAccount from clientName on each row", async () => {
+  const { deps, writes } = makeDeps();
+  deps.enricher = {
+    async enrich() {
+      return [
+        { summary: "Bug.", categories: ["Bug / Broken" as FeedbackCategory], clientName: "Acme" },
+        { summary: "Feature.", categories: ["Feature Request" as FeedbackCategory], clientName: "Acme" },
+      ];
+    },
+  };
+  await handleCapture(req, deps);
+  assert.strictEqual(writes[0].customerAccount, "Acme");
+  assert.strictEqual(writes[1].customerAccount, "Acme");
+});
+
+test("batch split — sets sourceMessageKey on each row", async () => {
+  const { deps, writes } = makeDeps();
+  deps.enricher = {
+    async enrich() {
+      return [
+        { summary: "Bug.", categories: ["Bug / Broken" as FeedbackCategory] },
+        { summary: "Feature.", categories: ["Feature Request" as FeedbackCategory] },
+      ];
+    },
+  };
+  await handleCapture(req, deps);
+  const expectedKey = `${req.channelId}:${req.messageTs}`;
+  assert.strictEqual(writes[0].sourceMessageKey, expectedKey);
+  assert.strictEqual(writes[1].sourceMessageKey, expectedKey);
+});
+
+test("batch split — recordMultiple called with all page IDs", async () => {
+  const { deps } = makeDeps();
+  const recordedMultiple: Array<{ key: string; pageIds: string[] }> = [];
+  let pageSeq = 0;
+  deps.notion.createFeedback = async () => `page_${++pageSeq}`;
+  deps.dedup.recordMultiple = (key, pageIds) => { recordedMultiple.push({ key, pageIds }); };
+  deps.enricher = {
+    async enrich() {
+      return [
+        { summary: "Bug.", categories: ["Bug / Broken" as FeedbackCategory] },
+        { summary: "Feature.", categories: ["Feature Request" as FeedbackCategory] },
+      ];
+    },
+  };
+  await handleCapture(req, deps);
+  assert.strictEqual(recordedMultiple.length, 1);
+  assert.deepStrictEqual(recordedMultiple[0].pageIds, ["page_1", "page_2"]);
+});
+
+test("batch split — sibling links written for each row (pass 2)", async () => {
+  const { deps } = makeDeps();
+  const siblingUpdates: Array<{ pageId: string; siblingPageIds: string[] }> = [];
+  let pageSeq = 0;
+  deps.notion.createFeedback = async () => `page_${++pageSeq}`;
+  (deps.notion as any).updateSiblingLinks = async (pageId: string, siblingPageIds: string[]) => {
+    siblingUpdates.push({ pageId, siblingPageIds });
+  };
+  deps.enricher = {
+    async enrich() {
+      return [
+        { summary: "Bug.", categories: ["Bug / Broken" as FeedbackCategory] },
+        { summary: "Feature.", categories: ["Feature Request" as FeedbackCategory] },
+        { summary: "UX issue.", categories: ["UX / Usability" as FeedbackCategory] },
+      ];
+    },
+  };
+  await handleCapture(req, deps);
+  assert.strictEqual(siblingUpdates.length, 3);
+  assert.deepStrictEqual(siblingUpdates[0], { pageId: "page_1", siblingPageIds: ["page_2", "page_3"] });
+  assert.deepStrictEqual(siblingUpdates[1], { pageId: "page_2", siblingPageIds: ["page_1", "page_3"] });
+  assert.deepStrictEqual(siblingUpdates[2], { pageId: "page_3", siblingPageIds: ["page_1", "page_2"] });
+});
+
+test("batch split — sibling link failure does not roll back rows (fail-open)", async () => {
+  const { deps, writes } = makeDeps();
+  let pageSeq = 0;
+  deps.notion.createFeedback = async (r) => { writes.push(r); return `page_${++pageSeq}`; };
+  (deps.notion as any).updateSiblingLinks = async () => { throw new Error("notion down"); };
+  deps.enricher = {
+    async enrich() {
+      return [
+        { summary: "Bug.", categories: ["Bug / Broken" as FeedbackCategory] },
+        { summary: "Feature.", categories: ["Feature Request" as FeedbackCategory] },
+      ];
+    },
+  };
+  const res = await handleCapture(req, deps);
+  assert.strictEqual(res.status, "captured");
+  assert.strictEqual(writes.length, 2);
+});
+
+test("single result — still works with array return (non-split path)", async () => {
+  const { deps, writes } = makeDeps();
+  deps.enricher = {
+    async enrich() {
+      return [{ summary: "SSO feature request.", categories: ["Feature Request" as FeedbackCategory] }];
+    },
+  };
+  await handleCapture(req, deps);
+  assert.strictEqual(writes.length, 1);
+  assert.strictEqual(writes[0].summary, "SSO feature request.");
+  // Single-item should NOT set sourceMessageKey
+  assert.strictEqual(writes[0].sourceMessageKey, undefined);
+});
+
+test("re-reaction on a batch key appends flagger to all stored page IDs", async () => {
+  const { deps, appendedFlaggers } = makeDeps();
+  const store = new Map<string, string | string[]>();
+  const key = `${req.channelId}:${req.messageTs}`;
+  store.set(key, ["page_1", "page_2", "page_3"]);
+  deps.dedup.has = (k) => store.has(k);
+  deps.dedup.getPageIds = (k) => {
+    const v = store.get(k);
+    if (!v) return [];
+    if (Array.isArray(v)) return v;
+    return [v];
+  };
+  deps.dedup.getPageId = (k) => {
+    const v = store.get(k);
+    if (!v) return null;
+    if (Array.isArray(v)) return v[0] ?? null;
+    return v as string;
+  };
+  const res = await handleCapture(req, deps);
+  assert.strictEqual(res.status, "flagger_added");
+  assert.strictEqual(appendedFlaggers.length, 3);
+  assert.deepStrictEqual(appendedFlaggers.map(f => f.pageId), ["page_1", "page_2", "page_3"]);
 });

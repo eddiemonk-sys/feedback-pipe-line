@@ -53,15 +53,18 @@ export async function handleCapture(
   const key = dedupKey(req);
 
   if (dedup.has(key)) {
-    const pageId = dedup.getPageId(key);
-    if (!pageId) {
-      logger.info("Skipping duplicate (no stored page ID)", { key });
+    const pageIds = dedup.getPageIds(key);
+    if (pageIds.length === 0) {
+      logger.info("Skipping duplicate (no stored page IDs)", { key });
       return { status: "duplicate", key };
     }
     try {
       const flaggedByName = await slack.resolveUserName(req.triggeredBy);
-      await notion.appendFlagger(pageId, flaggedByName);
-      logger.info("Appended flagger to existing feedback", { key, flaggedByName });
+      // Append flagger to all rows (batch-split messages have multiple page IDs)
+      for (const pageId of pageIds) {
+        await notion.appendFlagger(pageId, flaggedByName);
+      }
+      logger.info("Appended flagger to existing feedback", { key, flaggedByName, rowCount: pageIds.length });
       return { status: "flagger_added", key };
     } catch (err) {
       logger.error("Failed to append flagger", { key, err: String(err) });
@@ -108,68 +111,133 @@ export async function handleCapture(
       }
     }
 
-    let enrichment = await deps.enricher.enrich(text, channelName, images.length ? images : undefined).catch((err) => {
+    const enrichments = await deps.enricher.enrich(text, channelName, images.length ? images : undefined).catch((err) => {
       logger.warn("Enrichment failed — capturing without summary/category", { err: String(err) });
       return null;
     });
 
-    let verdict = enrichment
-      ? await deps.judge
-          .review(text, channelName, enrichment.summary, enrichment.categories)
-          .catch((err) => {
-            logger.warn("Judging failed — capturing without confidence/rationale", { err: String(err) });
-            return null;
-          })
-      : null;
+    const isBatch = enrichments !== null && enrichments.length > 1;
 
-    if (verdict?.confidence === "Low" && enrichment) {
-      const originalVerdict = verdict;
-      logger.info("Low confidence — retrying enrichment", {
-        key,
-        firstCategories: enrichment.categories,
-        judgeRationale: verdict.rationale,
-      });
-      const retryInput = `${text}\n\nNote: a previous classification of this message was rated Low confidence. Reviewer note: "${verdict.rationale}". Reconsider the category — pay particular attention to which category most precisely matches the primary signal.`;
-      const retryEnrichment = await deps.enricher.enrich(retryInput, channelName, images.length ? images : undefined).catch((err) => {
-        logger.warn("Retry enrichment failed — keeping original result", { err: String(err) });
-        return null;
-      });
-      if (retryEnrichment) {
-        const retryVerdict = await deps.judge
-          .review(retryInput, channelName, retryEnrichment.summary, retryEnrichment.categories)
-          .catch((err) => {
-            logger.warn("Retry judging failed — keeping original verdict", { err: String(err) });
-            return null;
-          });
-        enrichment = retryEnrichment;
-        verdict = retryVerdict ?? originalVerdict;
+    if (isBatch) {
+      // Batch split path: one row per item. No Low-confidence retry (too complex for batch).
+      const pageIds: string[] = [];
+      for (const enrichment of enrichments!) {
+        const verdict = enrichment
+          ? await deps.judge
+              .review(text, channelName, enrichment.summary, enrichment.categories)
+              .catch(() => null)
+          : null;
+
+        const relatedMatch = enrichment
+          ? await findRelatedFeedback(deps, enrichment.summary, enrichment.categories, logger)
+          : null;
+
+        const pageId = await notion.createFeedback({
+          message: text,
+          channelName,
+          authorName,
+          dateIso,
+          flaggedByName,
+          source,
+          messageUrl,
+          customerAccount: enrichment.clientName ?? "",
+          summary: enrichment.summary,
+          categories: enrichment.categories,
+          aiSuggestedCategories: [...enrichment.categories],
+          aiSuggestedSummary: enrichment.summary,
+          confidence: verdict?.confidence,
+          rationale: verdict?.rationale,
+          sourceMessageKey: key,
+          preambleContext: enrichment.preambleContext,
+          mentionedUsers: enrichment.mentionedUsers,
+          image: enrichment.imageIndices?.length
+            ? images[enrichment.imageIndices[0]]  // use explicitly attributed image
+            : undefined,
+          relatedFeedbackPageId: relatedMatch?.matchedPageId,
+          relatedFeedbackRationale: relatedMatch?.rationale,
+          status: req.initialStatus,
+        });
+        pageIds.push(pageId);
       }
+
+      dedup.recordMultiple(key, pageIds);
+
+      // Pass 2: sibling links. Fail-open — link failure must not roll back the capture.
+      if (pageIds.length > 1) {
+        for (const pageId of pageIds) {
+          const siblings = pageIds.filter((id) => id !== pageId);
+          await notion.updateSiblingLinks(pageId, siblings).catch((err) => {
+            logger.warn("updateSiblingLinks failed (fail-open)", { pageId, err: String(err) });
+          });
+        }
+      }
+
+    } else {
+      // Single-item path (non-split). Preserve existing retry logic.
+      let enrichment = enrichments?.[0] ?? null;
+
+      let verdict = enrichment
+        ? await deps.judge
+            .review(text, channelName, enrichment.summary, enrichment.categories)
+            .catch((err) => {
+              logger.warn("Judging failed — capturing without confidence/rationale", { err: String(err) });
+              return null;
+            })
+        : null;
+
+      if (verdict?.confidence === "Low" && enrichment) {
+        const originalVerdict = verdict;
+        logger.info("Low confidence — retrying enrichment", {
+          key,
+          firstCategories: enrichment.categories,
+          judgeRationale: verdict.rationale,
+        });
+        const retryInput = `${text}\n\nNote: a previous classification of this message was rated Low confidence. Reviewer note: "${verdict.rationale}". Reconsider the category — pay particular attention to which category most precisely matches the primary signal.`;
+        const retryEnrichments = await deps.enricher.enrich(retryInput, channelName, images.length ? images : undefined).catch((err) => {
+          logger.warn("Retry enrichment failed — keeping original result", { err: String(err) });
+          return null;
+        });
+        const retryEnrichment = retryEnrichments?.[0] ?? null;
+        if (retryEnrichment) {
+          const retryVerdict = await deps.judge
+            .review(retryInput, channelName, retryEnrichment.summary, retryEnrichment.categories)
+            .catch((err) => {
+              logger.warn("Retry judging failed — keeping original verdict", { err: String(err) });
+              return null;
+            });
+          enrichment = retryEnrichment;
+          verdict = retryVerdict ?? originalVerdict;
+        }
+      }
+
+      const relatedMatch = enrichment
+        ? await findRelatedFeedback(deps, enrichment.summary, enrichment.categories, logger)
+        : null;
+
+      const pageId = await notion.createFeedback({
+        message: text,
+        channelName,
+        authorName,
+        dateIso,
+        flaggedByName,
+        source,
+        messageUrl,
+        customerAccount: enrichment?.clientName ?? "",
+        summary: enrichment?.summary,
+        categories: enrichment?.categories,
+        aiSuggestedCategories: enrichment?.categories ? [...enrichment.categories] : undefined,
+        aiSuggestedSummary: enrichment?.summary,
+        confidence: verdict?.confidence,
+        rationale: verdict?.rationale,
+        image: images[0],
+        relatedFeedbackPageId: relatedMatch?.matchedPageId,
+        relatedFeedbackRationale: relatedMatch?.rationale,
+        status: req.initialStatus,
+      });
+
+      dedup.record(key, pageId);
     }
 
-    const relatedMatch = enrichment ? await findRelatedFeedback(deps, enrichment.summary, enrichment.categories, logger) : null;
-
-    const pageId = await notion.createFeedback({
-      message: text,
-      channelName,
-      authorName,
-      dateIso,
-      flaggedByName,
-      source,
-      messageUrl,
-      customerAccount: "",
-      summary: enrichment?.summary,
-      categories: enrichment?.categories,
-      aiSuggestedCategories: enrichment?.categories ? [...enrichment.categories] : undefined,
-      aiSuggestedSummary: enrichment?.summary,
-      confidence: verdict?.confidence,
-      rationale: verdict?.rationale,
-      image: images[0],
-      relatedFeedbackPageId: relatedMatch?.matchedPageId,
-      relatedFeedbackRationale: relatedMatch?.rationale,
-      status: req.initialStatus,
-    });
-
-    dedup.record(key, pageId);
     logger.info("Captured feedback", { key, channelName, authorName, flaggedByName });
     return { status: "captured", key };
   } catch (err) {
