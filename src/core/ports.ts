@@ -56,6 +56,14 @@ export interface FeedbackRecord {
   image?: ImageAttachment;
   relatedFeedbackPageId?: string;
   relatedFeedbackRationale?: string;
+  /** channelId:messageTs of the parent Slack message. Present on all rows from a batch-split capture. */
+  sourceMessageKey?: string;
+  /** Framing text from the message header. Propagated to every child row in a batch split. */
+  preambleContext?: string;
+  /** @mention display names within this item's bullet (not preamble-level mentions). */
+  mentionedUsers?: string[];
+  /** Notion page IDs of sibling rows from the same batch split. Populated in pass 2. */
+  siblingPageIds?: string[];
   /** Initial Notion Status. Defaults to "New". Live gate sets "Needs Review" for medium/low confidence. */
   status?: "New" | "Needs Review";
 }
@@ -67,6 +75,11 @@ export interface NotionWriter {
   appendFlagger(pageId: string, newFlaggerName: string): Promise<void>;
   /** Recent rows in any of the given categories, for similarity comparison. */
   findRecentByCategories(categories: FeedbackCategory[], sinceDateIso: string): Promise<Array<{ pageId: string; summary: string }>>;
+  /**
+   * Write the `Siblings` relation on a page, linking it to all sibling page IDs.
+   * Called in pass 2 after all child rows are created. Fails open — caller logs and continues.
+   */
+  updateSiblingLinks(pageId: string, siblingPageIds: string[]): Promise<void>;
 }
 
 /** Dedup store keyed on a stable message key (channelId:messageTs). */
@@ -80,6 +93,16 @@ export interface DedupStore {
   delete(key: string): void;
   /** Find the dedup key associated with a Notion page ID. Returns null if not found. */
   findKeyByPageId(pageId: string): string | null;
+  /**
+   * Record a batch-split key alongside all its page IDs (replaces individual `record()` calls
+   * when a single message produces multiple rows).
+   */
+  recordMultiple(key: string, pageIds: string[]): void;
+  /**
+   * Return all page IDs stored for a key. Returns `[]` if the key is absent.
+   * For legacy entries (single string or null), wraps in array for uniform iteration.
+   */
+  getPageIds(key: string): string[];
   close(): void;
 }
 
@@ -120,10 +143,15 @@ export interface EnrichmentResult {
   summary: string;
   /** 1–2 AI-assigned categories. Never empty. */
   categories: FeedbackCategory[];
+  // Batch metadata — populated only when the enricher splits a message into multiple items:
+  preambleContext?: string;     // framing text from message header (e.g. "Call notes from DTG meeting:")
+  clientName?: string;          // account name extracted from preamble; explicit only, never inferred
+  mentionedUsers?: string[];    // @mention display names within this item's bullet
+  imageIndices?: number[];      // indices into the parent images[] array this item claims
 }
 
 export interface Enricher {
-  enrich(text: string, channelName: string, images?: ImageAttachment[]): Promise<EnrichmentResult | null>;
+  enrich(text: string, channelName: string, images?: ImageAttachment[]): Promise<EnrichmentResult[] | null>;
 }
 
 export type ConfidenceLevel = "High" | "Medium" | "Low";
