@@ -1,0 +1,16 @@
+{
+  "description": "Reply directly addresses one of two rows — routes to primary only",
+  "input": {
+    "replyText": "Update on the language-per-stage request — this is now in our Q3 roadmap.",
+    "replyImageUrls": [],
+    "candidates": [
+      { "pageId": "page-lang-001", "summary": "DTG want to set interview language per stage (English early, German final)." },
+      { "pageId": "page-score-002", "summary": "DTG want custom scoring weights, e.g. 2x weight for communication in senior roles." }
+    ]
+  },
+  "expectedOutput": {
+    "routes": [
+      { "pageId": "page-lang-001", "relevance": "primary" }
+    ]
+  }
+}

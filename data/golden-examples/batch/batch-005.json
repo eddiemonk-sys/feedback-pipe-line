@@ -1,0 +1,11 @@
+{
+  "description": "Preamble-only message with no actionable items — edge case",
+  "input": {
+    "text": "Great session today. The team are very engaged and looking forward to the next steps.",
+    "imageUrls": []
+  },
+  "expectedOutput": {
+    "itemCount": 1,
+    "note": "No actionable items — enricher should still produce one row with a note that no specific feedback was captured"
+  }
+}

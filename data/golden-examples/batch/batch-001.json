@@ -1,0 +1,21 @@
+{
+  "description": "DTG session — two distinct items: language-per-interview-stage and custom scoring",
+  "input": {
+    "text": "Had a great session with DTG. Two things came up:\n1. They want to set the interview language per stage (English for early stages, German for final rounds).\n2. They'd like custom scoring weights — e.g. weight 'communication' 2x for senior roles.",
+    "imageUrls": []
+  },
+  "expectedOutput": {
+    "itemCount": 2,
+    "items": [
+      {
+        "summaryContains": ["language", "stage", "English", "German"],
+        "categories": ["Internationalisation"]
+      },
+      {
+        "summaryContains": ["scoring", "weight", "senior"],
+        "categories": ["Assessment Configuration"]
+      }
+    ],
+    "preambleContextContains": "DTG"
+  }
+}

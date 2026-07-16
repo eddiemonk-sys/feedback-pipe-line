@@ -1,0 +1,16 @@
+{
+  "description": "Two items where second modifies first — should NOT split",
+  "input": {
+    "text": "They want the scorecard to show colour-coded ratings. And the same applies to the panel review view.",
+    "imageUrls": []
+  },
+  "expectedOutput": {
+    "itemCount": 1,
+    "items": [
+      {
+        "summaryContains": ["colour-coded", "scorecard", "panel review"],
+        "categories": ["Scorecards"]
+      }
+    ]
+  }
+}
