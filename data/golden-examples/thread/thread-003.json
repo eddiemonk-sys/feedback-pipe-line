@@ -1,0 +1,17 @@
+{
+  "description": "Reply addresses both rows — both as primary",
+  "input": {
+    "replyText": "Just confirmed with the client — both the ATS import AND the no-decision outcome are blockers for their October launch.",
+    "replyImageUrls": [],
+    "candidates": [
+      { "pageId": "page-001", "summary": "User wants bulk candidate import from ATS before October go-live." },
+      { "pageId": "page-002", "summary": "User wants no-decision outcome option in interview results." }
+    ]
+  },
+  "expectedOutput": {
+    "routes": [
+      { "pageId": "page-001", "relevance": "primary" },
+      { "pageId": "page-002", "relevance": "primary" }
+    ]
+  }
+}

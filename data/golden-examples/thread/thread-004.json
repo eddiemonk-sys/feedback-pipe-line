@@ -1,0 +1,15 @@
+{
+  "description": "Single candidate — always routes to it",
+  "input": {
+    "replyText": "This has been fixed in v2.3.",
+    "replyImageUrls": [],
+    "candidates": [
+      { "pageId": "page-only", "summary": "Users cannot export scorecard results as PDF." }
+    ]
+  },
+  "expectedOutput": {
+    "routes": [
+      { "pageId": "page-only", "relevance": "primary" }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "description": "Single item with preamble — should NOT be split",
+  "input": {
+    "text": "Quick note from the NIQ call. They really need bulk candidate import from their ATS before the October go-live.",
+    "imageUrls": []
+  },
+  "expectedOutput": {
+    "itemCount": 1,
+    "items": [
+      {
+        "summaryContains": ["bulk candidate import", "ATS", "October"],
+        "categories": ["Integrations"]
+      }
+    ],
+    "preambleContextContains": "NIQ"
+  }
+}

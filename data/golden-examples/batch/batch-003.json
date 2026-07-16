@@ -1,0 +1,15 @@
+{
+  "description": "Three items — explicit numbered list",
+  "input": {
+    "text": "Feedback from Bain:\n1. Need a 'no-decision' outcome option in interview results\n2. Candidate self-scheduling for final rounds\n3. Auto-archive candidates who haven't responded in 30 days",
+    "imageUrls": []
+  },
+  "expectedOutput": {
+    "itemCount": 3,
+    "items": [
+      { "summaryContains": ["no-decision", "outcome"], "categories": ["Interview Outcomes"] },
+      { "summaryContains": ["self-scheduling", "final"], "categories": ["Scheduling"] },
+      { "summaryContains": ["auto-archive", "30 days"], "categories": ["Candidate Management"] }
+    ]
+  }
+}

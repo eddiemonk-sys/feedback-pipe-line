@@ -1,0 +1,16 @@
+{
+  "description": "Reply with screenshot — routes to the row the screenshot clarifies",
+  "input": {
+    "replyText": "Here's what they mean by the broken state.",
+    "replyImageUrls": ["https://example.com/screenshot.png"],
+    "candidates": [
+      { "pageId": "page-ui-bug", "summary": "Users report the scorecard grid breaks on mobile viewport." },
+      { "pageId": "page-export", "summary": "Users cannot export scorecard results as PDF." }
+    ]
+  },
+  "expectedOutput": {
+    "routes": [
+      { "pageId": "page-ui-bug", "relevance": "primary" }
+    ]
+  }
+}

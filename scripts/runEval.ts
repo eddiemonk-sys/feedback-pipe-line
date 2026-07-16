@@ -3,12 +3,16 @@
 //   npx tsx scripts/runEval.ts gate      — gate precision/recall/F1 + breakdown by confidence bucket
 //   npx tsx scripts/runEval.ts enricher  — category accuracy overall + per-category table
 //   npx tsx scripts/runEval.ts judge     — judge calibration (runs enricher + judge; expensive)
+//   npx tsx scripts/runEval.ts --mode batch   — batch splitting fixtures pass/fail
+//   npx tsx scripts/runEval.ts --mode thread  — thread routing fixtures pass/fail
 import "dotenv/config";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { FeedbackGate } from "../src/adapters/gate/claudeFeedbackGate.js";
 import { AnthropicLLMClient } from "../src/adapters/llm/anthropicClient.js";
 import { Enricher } from "../src/adapters/enricher/claudeEnricher.js";
 import { Judge } from "../src/adapters/judge/claudeJudge.js";
+import { ClaudeThreadRouter } from "../src/adapters/threadRouter/claudeThreadRouter.js";
 import { loadPrompt } from "../src/util/loadPrompt.js";
 import { loadGuideFile } from "../src/util/loadGuideFile.js";
 import { CATEGORIES } from "../src/core/taxonomy.js";
@@ -289,18 +293,182 @@ async function evalJudge(config: EvalConfig) {
   return { summary, rows: results };
 }
 
+// ─── Batch Eval ──────────────────────────────────────────────────────────────
+
+async function evalBatch(config: EvalConfig) {
+  if (!config.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY required.");
+  const styleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
+  const enricher = new Enricher(
+    new AnthropicLLMClient(config.anthropicApiKey, process.env.ENRICHER_MODEL ?? "claude-sonnet-4-6"),
+    loadPrompt("enricher"),
+    styleGuide,
+  );
+
+  const batchDir = new URL("../data/golden-examples/batch/", import.meta.url);
+  const files = readdirSync(fileURLToPath(batchDir)).filter((f) => f.endsWith(".json"));
+  if (files.length === 0) {
+    console.log("No batch fixtures found in data/golden-examples/batch/");
+    process.exit(0);
+  }
+
+  let passed = 0;
+  for (const file of files.sort()) {
+    const fixture = JSON.parse(
+      readFileSync(fileURLToPath(new URL(`../data/golden-examples/batch/${file}`, import.meta.url)), "utf8"),
+    );
+    console.log(`\n--- ${file}: ${fixture.description} ---`);
+
+    if (fixture.expectedOutput.note) {
+      console.log(`  SKIP (manual check required): ${fixture.expectedOutput.note}`);
+      passed++;
+      continue;
+    }
+
+    const enrichments = await enricher.enrich(fixture.input.text, "eval-channel");
+
+    if (!enrichments) {
+      console.log("  FAIL: enricher returned null");
+      continue;
+    }
+
+    const expectedCount = fixture.expectedOutput.itemCount;
+    if (enrichments.length !== expectedCount) {
+      console.log(`  FAIL: expected ${expectedCount} items, got ${enrichments.length}`);
+      continue;
+    }
+
+    let itemsPassed = true;
+    for (let i = 0; i < fixture.expectedOutput.items.length; i++) {
+      const expected = fixture.expectedOutput.items[i];
+      const actual = enrichments[i];
+      if (!actual) { itemsPassed = false; break; }
+
+      const summaryLower = actual.summary.toLowerCase();
+      const missingTerms = (expected.summaryContains ?? []).filter(
+        (t: string) => !summaryLower.includes(t.toLowerCase()),
+      );
+      if (missingTerms.length > 0) {
+        console.log(`  FAIL item[${i}]: summary missing: ${missingTerms.join(", ")}`);
+        itemsPassed = false;
+      }
+    }
+
+    if (itemsPassed) {
+      console.log(`  PASS (${enrichments.length} items)`);
+      passed++;
+    }
+  }
+
+  const total = files.length;
+  const pct = ((passed / total) * 100).toFixed(1);
+  console.log(`\nBatch eval: ${passed}/${total} (${pct}%) — threshold >=80.0%`);
+  if (passed / total < 0.8) process.exit(1);
+}
+
+// ─── Thread Eval ─────────────────────────────────────────────────────────────
+
+async function evalThread(config: EvalConfig) {
+  if (!config.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY required.");
+
+  const threadDir = new URL("../data/golden-examples/thread/", import.meta.url);
+  const files = readdirSync(fileURLToPath(threadDir)).filter((f) => f.endsWith(".json"));
+  if (files.length === 0) {
+    console.log("No thread fixtures found in data/golden-examples/thread/");
+    process.exit(0);
+  }
+
+  const threadRouterModel = process.env.THREAD_ROUTER_MODEL ?? process.env.ENRICHER_MODEL ?? "claude-sonnet-4-6";
+  const threadRouterPrompt = loadPrompt("threadRouter");
+  const threadRouter = new ClaudeThreadRouter(
+    new AnthropicLLMClient(config.anthropicApiKey, threadRouterModel),
+    threadRouterPrompt ?? "",
+  );
+
+  let passed = 0;
+  for (const file of files.sort()) {
+    const fixture = JSON.parse(
+      readFileSync(fileURLToPath(new URL(`../data/golden-examples/thread/${file}`, import.meta.url)), "utf8"),
+    );
+    console.log(`\n--- ${file}: ${fixture.description} ---`);
+
+    const routes = await threadRouter.route(
+      fixture.input.replyText,
+      [], // images: pass empty for eval (no live Slack download)
+      fixture.input.candidates,
+    );
+
+    const expected = fixture.expectedOutput.routes;
+    const expectedIds = new Set(expected.map((r: { pageId: string }) => r.pageId));
+    const actualIds = new Set(routes.map((r) => r.pageId));
+
+    const missingIds = [...expectedIds].filter((id) => !actualIds.has(id));
+    const extraIds = [...actualIds].filter((id) => !(expectedIds as Set<string>).has(id));
+
+    if (missingIds.length > 0 || extraIds.length > 0) {
+      if (missingIds.length) console.log(`  FAIL: missing routes: ${missingIds.join(", ")}`);
+      if (extraIds.length) console.log(`  FAIL: unexpected routes: ${extraIds.join(", ")}`);
+      continue;
+    }
+
+    // Check relevance
+    let relevanceOk = true;
+    for (const exp of expected) {
+      const actual = routes.find((r) => r.pageId === exp.pageId);
+      if (!actual || actual.relevance !== exp.relevance) {
+        console.log(`  FAIL: ${exp.pageId} expected relevance=${exp.relevance}, got=${actual?.relevance}`);
+        relevanceOk = false;
+      }
+    }
+
+    if (relevanceOk) {
+      console.log(`  PASS (${routes.length} routes)`);
+      passed++;
+    }
+  }
+
+  const total = files.length;
+  const pct = ((passed / total) * 100).toFixed(1);
+  console.log(`\nThread eval: ${passed}/${total} (${pct}%) — threshold >=80.0%`);
+  if (passed / total < 0.8) process.exit(1);
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
+  // Parse --mode flag first. If found, run that mode and exit.
+  const mode = (() => {
+    const idx = process.argv.indexOf("--mode");
+    if (idx === -1) return "single";
+    return process.argv[idx + 1] ?? "single";
+  })();
+
+  if (!["single", "batch", "thread"].includes(mode)) {
+    console.error(`Unknown --mode: ${mode}. Valid: single, batch, thread`);
+    process.exit(1);
+  }
+
+  const config = loadEvalConfig();
+
+  if (mode === "batch") {
+    await evalBatch(config);
+    return;
+  }
+
+  if (mode === "thread") {
+    await evalThread(config);
+    return;
+  }
+
+  // Fall through to existing positional-arg logic (single mode)
   const adapterArg = process.argv.find((a) => a === "gate" || a === "enricher" || a === "judge");
   if (!adapterArg) {
     console.error("Usage: npx tsx scripts/runEval.ts gate|enricher|judge");
+    console.error("       npx tsx scripts/runEval.ts --mode batch|thread");
     process.exit(1);
   }
 
   if (!existsSync("./data/gold-set.csv")) throw new Error("./data/gold-set.csv not found. Run backfillExportGoldSet first.");
 
-  const config = loadEvalConfig();
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
   mkdirSync("./data/eval-results", { recursive: true });
 

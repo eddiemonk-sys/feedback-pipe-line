@@ -1,0 +1,17 @@
+{
+  "description": "General acknowledgement reply — routes all rows as secondary",
+  "input": {
+    "replyText": "Thanks for capturing all of this! Really useful.",
+    "replyImageUrls": [],
+    "candidates": [
+      { "pageId": "page-001", "summary": "User wants bulk candidate import from ATS before October go-live." },
+      { "pageId": "page-002", "summary": "User wants no-decision outcome option in interview results." }
+    ]
+  },
+  "expectedOutput": {
+    "routes": [
+      { "pageId": "page-001", "relevance": "secondary" },
+      { "pageId": "page-002", "relevance": "secondary" }
+    ]
+  }
+}
