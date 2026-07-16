@@ -1,6 +1,7 @@
 node_modules/
 .env
 data/
+!data/golden-criteria.md
 data/eval-results/
 dist/
 *.log
@@ -12,3 +13,4 @@ dist/
 # Correction logs — raw verbatim customer text; distilled by hand into docs/*.md guides
 enrichment-correction-log.md
 similarity-correction-log.md
+.devswarm-temp/
