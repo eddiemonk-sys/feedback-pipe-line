@@ -87,6 +87,12 @@ export class NotionFeedbackWriter implements NotionWriter {
         ...(r.mentionedUsers?.length
           ? { "Mentioned Users": { rich_text: [{ text: { content: r.mentionedUsers.join(", ").slice(0, MAX_TEXT) } }] } }
           : {}),
+        ...(r.clientCompany
+          ? { "Client Company": { rich_text: [{ text: { content: r.clientCompany.slice(0, MAX_TEXT) } }] } }
+          : {}),
+        ...(r.audience
+          ? { "Audience": { select: { name: r.audience } } }
+          : {}),
       },
     });
 

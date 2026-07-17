@@ -37,6 +37,10 @@ export interface Config {
   enrichmentStyleGuidePath: string;
   /** Path to the similarity detector's distilled rules guide, appended to its system prompt. */
   similarityRulesPath: string;
+  /** Granola folder ID to poll for meeting notes (DS-73). */
+  granolaFolderId: string;
+  /** How often to poll the Granola folder, in milliseconds. Default: 300_000 (5 min). */
+  granolaPollIntervalMs: number;
 }
 
 function required(name: string): string {
@@ -85,6 +89,8 @@ export function loadConfig(): Config {
     backfillWeeksBack: Number(process.env.BACKFILL_WEEKS_BACK ?? "8"),
     enrichmentStyleGuidePath: (process.env.ENRICHMENT_STYLE_GUIDE_PATH ?? "./docs/enrichment-style-guide.md").trim(),
     similarityRulesPath: (process.env.SIMILARITY_RULES_PATH ?? "./docs/similarity-rules.md").trim(),
+    granolaFolderId: (process.env.GRANOLA_FOLDER_ID ?? "0ddcb9b2-4d60-4774-842f-1d7bcd7897ea").trim(),
+    granolaPollIntervalMs: Number(process.env.GRANOLA_POLL_INTERVAL_MS ?? "300000"),
   };
 
   // Notion creds are only needed when actually writing to Notion.

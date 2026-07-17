@@ -13,6 +13,7 @@ import { AnthropicLLMClient } from "../src/adapters/llm/anthropicClient.js";
 import { Enricher } from "../src/adapters/enricher/claudeEnricher.js";
 import { Judge } from "../src/adapters/judge/claudeJudge.js";
 import { ClaudeThreadRouter } from "../src/adapters/threadRouter/claudeThreadRouter.js";
+import { GranolaGate } from "../src/adapters/granola/granolaGate.js";
 import { loadPrompt } from "../src/util/loadPrompt.js";
 import { loadGuideFile } from "../src/util/loadGuideFile.js";
 import { CATEGORIES } from "../src/core/taxonomy.js";
@@ -432,6 +433,77 @@ async function evalThread(config: EvalConfig) {
   if (passed / total < 0.8) process.exit(1);
 }
 
+// ─── Granola Gate Eval ───────────────────────────────────────────────────────
+
+async function evalGranolaGate(config: EvalConfig) {
+  if (!config.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY required.");
+
+  const manifest = JSON.parse(readFileSync("./data/granola-fixtures/manifest.json", "utf8"));
+  const fixtures = manifest.fixtures as Array<{
+    file: string;
+    label: string;
+    should_skip: boolean;
+    expected_feedback_count: number;
+    notes: string;
+  }>;
+
+  const gateModel = process.env.GATE_MODEL?.trim() || "claude-haiku-4-5-20251001";
+  const gate = new GranolaGate(
+    new AnthropicLLMClient(config.anthropicApiKey, gateModel),
+    loadPrompt("granolaGate"),
+  );
+  const promptVersion = readPromptVersion("granolaGate");
+
+  let tp = 0, tn = 0, fp = 0, fn = 0;
+  const results: unknown[] = [];
+
+  for (const fixture of fixtures) {
+    const filePath = `./data/granola-fixtures/${fixture.file}`;
+    if (!existsSync(filePath)) {
+      console.warn(`  Warning: fixture file not found: ${filePath}`);
+      continue;
+    }
+    const content = readFileSync(filePath, "utf8");
+    const title = fixture.label;
+    const humanShouldCapture = !fixture.should_skip;
+
+    const result = await gate.classify(title, content, []).catch(() => null);
+    const predicted = result?.shouldCapture ?? true; // fail-open → true
+
+    if (humanShouldCapture && predicted) tp++;
+    else if (!humanShouldCapture && !predicted) tn++;
+    else if (!humanShouldCapture && predicted) fp++;
+    else fn++;
+
+    results.push({
+      file: fixture.file,
+      label: fixture.label,
+      humanShouldCapture,
+      predicted,
+      reason: result?.reason,
+      correct: humanShouldCapture === predicted,
+    });
+  }
+
+  const precision = tp / (tp + fp) || 0;
+  const recall = tp / (tp + fn) || 0;
+  const overallF1 = f1Score(tp, fp, fn);
+
+  console.log("\n=== Granola Gate Eval ===");
+  console.log(`Prompt version: ${promptVersion}`);
+  console.log(`Overall  — Precision: ${(precision * 100).toFixed(1)}%  Recall: ${(recall * 100).toFixed(1)}%  F1: ${(overallF1 * 100).toFixed(1)}%  (TP=${tp} TN=${tn} FP=${fp} FN=${fn})`);
+  console.log(`Total fixtures: ${fixtures.length}`);
+
+  for (const r of results as Array<{ file: string; label: string; correct: boolean; reason?: string }>) {
+    const mark = r.correct ? "PASS" : "FAIL";
+    console.log(`  [${mark}] ${r.file}: ${r.label}`);
+    if (!r.correct) console.log(`         reason: ${r.reason}`);
+  }
+
+  const summary = { promptVersion, tp, tn, fp, fn, precision, recall, f1: overallF1, total: fixtures.length };
+  return { summary, rows: results };
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -442,8 +514,8 @@ async function main() {
     return process.argv[idx + 1] ?? "single";
   })();
 
-  if (!["single", "batch", "thread"].includes(mode)) {
-    console.error(`Unknown --mode: ${mode}. Valid: single, batch, thread`);
+  if (!["single", "batch", "thread", "granolaGate"].includes(mode)) {
+    console.error(`Unknown --mode: ${mode}. Valid: single, batch, thread, granolaGate`);
     process.exit(1);
   }
 
@@ -456,6 +528,16 @@ async function main() {
 
   if (mode === "thread") {
     await evalThread(config);
+    return;
+  }
+
+  if (mode === "granolaGate") {
+    const result = await evalGranolaGate(config);
+    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
+    mkdirSync("./data/eval-results", { recursive: true });
+    const outPath = `./data/eval-results/${ts}-granolaGate-${(result.summary as any).promptVersion}.json`;
+    writeFileSync(outPath, JSON.stringify(result, null, 2));
+    console.log(`\nResults saved to ${outPath}`);
     return;
   }
 

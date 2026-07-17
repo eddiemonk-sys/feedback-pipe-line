@@ -21,6 +21,8 @@ import type { CaptureRequest } from "./core/events.js";
 import type { Enricher, Judge, SimilarityDetector, SlackGateway, NotionWriter, LLMToolCall, ThreadRouter } from "./core/ports.js";
 import { ClaudeThreadRouter } from "./adapters/threadRouter/claudeThreadRouter.js";
 import { NullThreadRouter } from "./adapters/threadRouter/nullThreadRouter.js";
+import { startGranolaPoller, StubGranolaClient } from "./adapters/granola/granolaAdapter.js";
+import { GranolaGate as GranolaGateImpl } from "./adapters/granola/granolaGate.js";
 
 const SUCCESS_EMOJI = "white_check_mark";
 const FAILURE_EMOJI = "warning";
@@ -192,6 +194,34 @@ async function main(): Promise<void> {
     onCapture,
     logger,
   );
+
+  // Granola ingestion poller (DS-73). Runs alongside the HTTP transport.
+  // Uses a StubGranolaClient until MCP access from Node is confirmed — see TODO(DS-73-mcp).
+  if (hasLLMKey && config.anthropicApiKey) {
+    const granolaGatePrompt = loadPrompt("granolaGate");
+    const granolaGate = new GranolaGateImpl(
+      makeLLMClient(config.gateModel, config.anthropicApiKey),
+      granolaGatePrompt,
+    );
+    startGranolaPoller(
+      { folderId: config.granolaFolderId, pollIntervalMs: config.granolaPollIntervalMs },
+      {
+        granolaClient: new StubGranolaClient(),
+        gate: granolaGate,
+        enricher,
+        judge,
+        notion: feedbackWriter,
+        dedup,
+        similarityDetector,
+        similarityWindowDays: config.similarityWindowDays,
+        source: "Granola",
+      },
+      logger,
+    );
+    logger.info(`Granola poller started (folder=${config.granolaFolderId}, interval=${config.granolaPollIntervalMs}ms) — using StubGranolaClient (MCP not yet wired)`);
+  } else {
+    logger.info("Granola poller disabled — set ANTHROPIC_API_KEY to enable");
+  }
 
   const shutdown = () => {
     logger.info("Shutting down");

@@ -66,6 +66,10 @@ export interface FeedbackRecord {
   siblingPageIds?: string[];
   /** Initial Notion Status. Defaults to "New". Live gate sets "Needs Review" for medium/low confidence. */
   status?: "New" | "Needs Review";
+  /** Company name of the external client (Granola ingestion). Derived from participant email domain or meeting title. */
+  clientCompany?: string;
+  /** Primary audience persona for this feedback item (Granola ingestion). */
+  audience?: "Recruiter" | "Talent Leader" | "Candidate" | "Worker" | "Admin" | "Unknown";
 }
 
 export interface NotionWriter {
@@ -251,4 +255,43 @@ export interface ThreadRouter {
     replyImages: ImageAttachment[],
     candidates: Array<{ pageId: string; summary: string; preambleContext?: string }>,
   ): Promise<ThreadRouterResult[]>;
+}
+
+/** A meeting note from Granola, reduced to what the core needs. */
+export interface GranolaNote {
+  id: string;
+  title: string;
+  /** ISO 8601 date string. */
+  createdAt: string;
+}
+
+/**
+ * Provider-agnostic Granola client. The real adapter uses the Granola MCP tools;
+ * tests use a stub. Fails open — listNotes returns [] on any error.
+ */
+export interface GranolaClient {
+  /** List all notes in a given folder. Returns [] if folder is empty or on error. */
+  listNotes(folderId: string): Promise<GranolaNote[]>;
+  /** Fetch the full markdown content of a specific note. Returns "" on error. */
+  getNoteContent(noteId: string): Promise<string>;
+}
+
+export interface GranolaGateResult {
+  /** True if this meeting note contains client feedback worth capturing. */
+  shouldCapture: boolean;
+  /** One short sentence explaining the decision. */
+  reason: string;
+}
+
+/**
+ * Gate for Granola meeting notes. Decides whether a note contains client-facing
+ * product feedback worth ingesting. Fails open — returns null on any error, which
+ * the adapter treats as "capture" (high-recall bias).
+ */
+export interface GranolaGate {
+  classify(
+    title: string,
+    markdownContent: string,
+    participants: string[],
+  ): Promise<GranolaGateResult | null>;
 }

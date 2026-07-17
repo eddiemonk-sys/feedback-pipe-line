@@ -1,7 +1,7 @@
 // src/util/loadPrompt.ts
 import { readFileSync, existsSync } from "node:fs";
 
-type PromptKey = "gate" | "enricher" | "judge" | "threadRouter";
+type PromptKey = "gate" | "enricher" | "judge" | "threadRouter" | "granolaGate";
 
 function readConfig(): Record<string, string> {
   const configPath = "./prompts/config.yaml";
