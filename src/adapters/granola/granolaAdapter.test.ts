@@ -26,7 +26,6 @@ function makeLogger(): Logger {
     info: () => {},
     warn: () => {},
     error: () => {},
-    debug: () => {},
   };
 }
 

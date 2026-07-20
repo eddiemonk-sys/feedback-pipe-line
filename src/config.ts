@@ -41,6 +41,12 @@ export interface Config {
   granolaFolderId: string;
   /** How often to poll the Granola folder, in milliseconds. Default: 300_000 (5 min). */
   granolaPollIntervalMs: number;
+  /**
+   * Slack channel IDs to auto-capture from using the live gate (comma-separated in env).
+   * Empty = feature disabled. Messages in these channels are run through the gate and
+   * captured automatically — no emoji reaction needed.
+   */
+  autoCaptureChannelIds: string[];
 }
 
 function required(name: string): string {
@@ -91,6 +97,10 @@ export function loadConfig(): Config {
     similarityRulesPath: (process.env.SIMILARITY_RULES_PATH ?? "./docs/similarity-rules.md").trim(),
     granolaFolderId: (process.env.GRANOLA_FOLDER_ID ?? "0ddcb9b2-4d60-4774-842f-1d7bcd7897ea").trim(),
     granolaPollIntervalMs: Number(process.env.GRANOLA_POLL_INTERVAL_MS ?? "300000"),
+    autoCaptureChannelIds: (process.env.AUTO_CAPTURE_CHANNEL_IDS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
   };
 
   // Notion creds are only needed when actually writing to Notion.

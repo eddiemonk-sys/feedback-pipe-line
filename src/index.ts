@@ -23,6 +23,9 @@ import { ClaudeThreadRouter } from "./adapters/threadRouter/claudeThreadRouter.j
 import { NullThreadRouter } from "./adapters/threadRouter/nullThreadRouter.js";
 import { startGranolaPoller, StubGranolaClient } from "./adapters/granola/granolaAdapter.js";
 import { GranolaGate as GranolaGateImpl } from "./adapters/granola/granolaGate.js";
+import { FeedbackGate as FeedbackGateImpl } from "./adapters/gate/claudeFeedbackGate.js";
+import { NullFeedbackGate } from "./adapters/gate/nullFeedbackGate.js";
+import type { FeedbackGate } from "./core/ports.js";
 
 const SUCCESS_EMOJI = "white_check_mark";
 const FAILURE_EMOJI = "warning";
@@ -142,6 +145,16 @@ async function main(): Promise<void> {
       : "Thread routing disabled — set ANTHROPIC_API_KEY to enable",
   );
 
+  const gatePrompt = loadPrompt("gate");
+  const feedbackGate: FeedbackGate = hasLLMKey && config.anthropicApiKey
+    ? new FeedbackGateImpl(makeLLMClient(config.gateModel, config.anthropicApiKey), gatePrompt ?? "")
+    : new NullFeedbackGate();
+  logger.info(
+    config.autoCaptureChannelIds.length > 0
+      ? `Live gate auto-capture enabled for channels: ${config.autoCaptureChannelIds.join(", ")} (${config.gateModel})`
+      : "Live gate auto-capture disabled — set AUTO_CAPTURE_CHANNEL_IDS to enable",
+  );
+
   const deps: CaptureDeps = {
     slack,
     notion: feedbackWriter,
@@ -183,12 +196,36 @@ async function main(): Promise<void> {
     await handleThreadReply(channelId, threadTs, replyTs, replyUserId, replyText, replyImageUrls, threadReplyDeps);
   };
 
+  const onChannelMessage = async (
+    channelId: string,
+    messageTs: string,
+    authorUserId: string,
+    text: string,
+    _imageUrls: string[],
+  ): Promise<void> => {
+    if (!config.autoCaptureChannelIds.includes(channelId)) return;
+    const channelName = await slack.resolveChannelName(channelId).catch(() => channelId);
+    const gateResult = await feedbackGate.classify(text, channelName).catch(() => null);
+    if (!gateResult?.isLikelyFeedback) return;
+
+    logger.info("Live gate: auto-capturing message", { channelId, messageTs, confidence: gateResult.confidence });
+    const req: CaptureRequest = {
+      triggerType: "live_gate",
+      channelId,
+      messageTs,
+      triggeredBy: authorUserId,
+      initialStatus: gateResult.confidence === "High" ? "New" : "Needs Review",
+    };
+    await onCapture(req);
+  };
+
   await startHttpMode(
     {
       botToken: config.slackBotToken,
       signingSecret: config.slackSigningSecret,
       triggerEmoji: config.triggerEmoji,
       onThreadReply,
+      onChannelMessage,
       botUserId,
     },
     onCapture,

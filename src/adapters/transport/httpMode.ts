@@ -18,6 +18,14 @@ export interface HttpModeOptions {
     replyText: string,
     replyImageUrls: string[],
   ) => Promise<void>;
+  /** Called for each non-bot top-level message — used for live-gate auto-capture. */
+  onChannelMessage?: (
+    channelId: string,
+    messageTs: string,
+    authorUserId: string,
+    text: string,
+    imageUrls: string[],
+  ) => Promise<void>;
   /** Bot's own user ID — used to filter out the bot's own ack replies (R6 loop prevention). */
   botUserId?: string;
 }
@@ -77,29 +85,47 @@ export async function startHttpMode(
     }
   });
 
-  if (options.onThreadReply) {
+  // Single message handler — split top-level messages from thread replies.
+  if (options.onThreadReply || options.onChannelMessage) {
     app.event("message", async ({ event }: any) => {
-      if (!event.thread_ts || event.thread_ts === event.ts) return;
       if (event.bot_id) return;
       if (options.botUserId && event.user === options.botUserId) return;
       if (!event.text && !event.files?.length) return;
 
-      const replyImageUrls: string[] = (event.files ?? [])
+      const imageUrls: string[] = (event.files ?? [])
         .filter((f: any) => f.mimetype?.startsWith("image/"))
         .map((f: any) => f.url_private as string)
         .filter(Boolean);
 
-      try {
-        await options.onThreadReply!(
-          event.channel,
-          event.thread_ts,
-          event.ts,
-          event.user ?? "",
-          event.text ?? "",
-          replyImageUrls,
-        );
-      } catch (err) {
-        logger.error("onThreadReply threw", { err: String(err) });
+      const isThreadReply = event.thread_ts && event.thread_ts !== event.ts;
+
+      if (isThreadReply) {
+        if (!options.onThreadReply) return;
+        try {
+          await options.onThreadReply(
+            event.channel,
+            event.thread_ts,
+            event.ts,
+            event.user ?? "",
+            event.text ?? "",
+            imageUrls,
+          );
+        } catch (err) {
+          logger.error("onThreadReply threw", { err: String(err) });
+        }
+      } else {
+        if (!options.onChannelMessage) return;
+        try {
+          await options.onChannelMessage(
+            event.channel,
+            event.ts,
+            event.user ?? "",
+            event.text ?? "",
+            imageUrls,
+          );
+        } catch (err) {
+          logger.error("onChannelMessage threw", { err: String(err) });
+        }
       }
     });
   }

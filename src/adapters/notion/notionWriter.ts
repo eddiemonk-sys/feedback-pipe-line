@@ -312,7 +312,7 @@ export class NotionFeedbackWriter implements NotionWriter {
             type: "image",
             image: { type: "file_upload", file_upload: { id } },
           })),
-        }).catch((err) => console.warn("[notionWriter] child image append failed:", err));
+        }).catch((err: unknown) => console.warn("[notionWriter] child image append failed:", err));
       }
     }
   }
