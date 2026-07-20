@@ -62,6 +62,7 @@ function makeDeps() {
       updateSiblingLinks: async (_pageId: string, _siblingPageIds: string[]) => {},
       updateSummaryAndLog: async () => {},
       getPageSummaries: async () => [],
+      relinkRelatedFeedback: async () => {},
     },
     slack: {
       getMessage: async () => ({ text: "Customers keep asking for SSO", authorUserId: "Uauthor" }),
@@ -95,6 +96,7 @@ function makeDeps() {
         similarityCalls.push({ summary, categories, candidates });
         return null;
       },
+      selectMaster: async () => "existing" as const,
     },
     similarityWindowDays: 30,
   };

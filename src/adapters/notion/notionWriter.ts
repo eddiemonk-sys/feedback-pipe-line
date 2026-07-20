@@ -317,6 +317,40 @@ export class NotionFeedbackWriter implements NotionWriter {
     }
   }
 
+  async relinkRelatedFeedback(masterPageId: string, childPageId: string): Promise<void> {
+    // 1. Append child to master's "Related Feedback" list.
+    try {
+      const masterPage = await this.client.pages.retrieve({ page_id: masterPageId });
+      const existing: Array<{ id: string }> =
+        ((masterPage as any).properties as Record<string, any>)["Related Feedback"]?.relation ?? [];
+      const alreadyLinked = existing.some((r) => r.id === childPageId);
+      if (!alreadyLinked) {
+        await this.client.pages.update({
+          page_id: masterPageId,
+          properties: {
+            "Related Feedback": {
+              relation: [...existing.map((r) => ({ id: r.id })), { id: childPageId }],
+            },
+          },
+        });
+      }
+    } catch (err: unknown) {
+      console.warn("[notionWriter] relinkRelatedFeedback: master update failed:", err);
+    }
+
+    // 2. Set child's "Related Feedback" to [master] (overwrite — child has exactly one master).
+    try {
+      await this.client.pages.update({
+        page_id: childPageId,
+        properties: {
+          "Related Feedback": { relation: [{ id: masterPageId }] },
+        },
+      });
+    } catch (err: unknown) {
+      console.warn("[notionWriter] relinkRelatedFeedback: child update failed:", err);
+    }
+  }
+
   /**
    * Backfill-only: overwrite the human-editable Category / Summary on an existing row.
    * Leaves "AI Suggested Category" untouched so the AI's original call stays diffable.

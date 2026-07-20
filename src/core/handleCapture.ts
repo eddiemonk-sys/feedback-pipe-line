@@ -132,6 +132,11 @@ export async function handleCapture(
           ? await findRelatedFeedback(deps, enrichment.summary, enrichment.categories, logger)
           : null;
 
+        const masterChoice = relatedMatch?.matchedSummary
+          ? await deps.similarityDetector.selectMaster(enrichment.summary, relatedMatch.matchedSummary).catch(() => "existing" as const)
+          : "existing";
+        const newIsChild = masterChoice === "existing";
+
         const pageId = await notion.createFeedback({
           message: text,
           channelName,
@@ -153,12 +158,20 @@ export async function handleCapture(
           image: enrichment.imageIndices?.length
             ? images[enrichment.imageIndices[0]]  // use explicitly attributed image
             : undefined,
-          relatedFeedbackPageId: relatedMatch?.matchedPageId,
+          relatedFeedbackPageId: newIsChild ? relatedMatch?.matchedPageId : undefined,
           relatedFeedbackRationale: relatedMatch?.rationale,
           status: req.initialStatus,
           title: enrichment.title,
         });
         pageIds.push(pageId);
+
+        if (relatedMatch) {
+          const masterPageId = newIsChild ? relatedMatch.matchedPageId : pageId;
+          const childPageId = newIsChild ? pageId : relatedMatch.matchedPageId;
+          await notion.relinkRelatedFeedback(masterPageId, childPageId).catch((err) => {
+            logger.warn("relinkRelatedFeedback failed (fail-open)", { err: String(err) });
+          });
+        }
       }
 
       dedup.recordMultiple(key, pageIds);
@@ -215,6 +228,11 @@ export async function handleCapture(
         ? await findRelatedFeedback(deps, enrichment.summary, enrichment.categories, logger)
         : null;
 
+      const masterChoice = relatedMatch?.matchedSummary && enrichment
+        ? await deps.similarityDetector.selectMaster(enrichment.summary, relatedMatch.matchedSummary).catch(() => "existing" as const)
+        : "existing";
+      const newIsChild = masterChoice === "existing";
+
       const pageId = await notion.createFeedback({
         message: text,
         channelName,
@@ -231,11 +249,19 @@ export async function handleCapture(
         confidence: verdict?.confidence,
         rationale: verdict?.rationale,
         image: images[0],
-        relatedFeedbackPageId: relatedMatch?.matchedPageId,
+        relatedFeedbackPageId: newIsChild ? relatedMatch?.matchedPageId : undefined,
         relatedFeedbackRationale: relatedMatch?.rationale,
         status: req.initialStatus,
         title: enrichment?.title,
       });
+
+      if (relatedMatch) {
+        const masterPageId = newIsChild ? relatedMatch.matchedPageId : pageId;
+        const childPageId = newIsChild ? pageId : relatedMatch.matchedPageId;
+        await notion.relinkRelatedFeedback(masterPageId, childPageId).catch((err) => {
+          logger.warn("relinkRelatedFeedback failed (fail-open)", { err: String(err) });
+        });
+      }
 
       dedup.record(key, pageId);
     }

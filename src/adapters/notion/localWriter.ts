@@ -82,6 +82,17 @@ export class LocalFeedbackWriter implements NotionWriter {
     return [];
   }
 
+  async relinkRelatedFeedback(masterPageId: string, childPageId: string): Promise<void> {
+    const line = JSON.stringify({
+      capturedAt: new Date().toISOString(),
+      event: "related_feedback_linked",
+      masterPageId,
+      childPageId,
+    });
+    appendFileSync(this.filePath, line + "\n", "utf8");
+    this.logger.info("Related feedback linked (local)", { masterPageId, childPageId });
+  }
+
   async updateSummaryAndLog(
     pageId: string,
     replyText: string,

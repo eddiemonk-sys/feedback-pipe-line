@@ -5,4 +5,8 @@ export class NullSimilarityDetector implements SimilarityDetector {
   async findSimilar(): Promise<null> {
     return null;
   }
+
+  async selectMaster(): Promise<"existing"> {
+    return "existing";
+  }
 }

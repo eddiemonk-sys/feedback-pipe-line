@@ -110,6 +110,14 @@ export interface NotionWriter {
   getPageSummaries(
     pageIds: string[],
   ): Promise<Array<{ pageId: string; summary: string; preambleContext?: string }>>;
+
+  /**
+   * Establishes a master/child link between two related-feedback rows (fail-open).
+   * Appends childPageId to master's "Related Feedback" relation list,
+   * and overwrites child's "Related Feedback" to [masterPageId].
+   * Called after createFeedback — never blocks a capture on failure.
+   */
+  relinkRelatedFeedback(masterPageId: string, childPageId: string): Promise<void>;
 }
 
 /** Dedup store keyed on a stable message key (channelId:messageTs). */
@@ -210,6 +218,8 @@ export interface Judge {
 export interface SimilarMatch {
   matchedPageId: string;
   rationale: string;
+  /** The matched row's summary — used for master/child selection. */
+  matchedSummary?: string;
 }
 
 export interface FeedbackGateResult {
@@ -232,6 +242,13 @@ export interface SimilarityDetector {
     categories: FeedbackCategory[],
     candidates: Array<{ pageId: string; summary: string }>,
   ): Promise<SimilarMatch | null>;
+  /**
+   * Given two summaries, picks which is the better canonical master: "new" (the incoming
+   * capture) or "existing" (the row already in Notion). "new" wins when it is more specific,
+   * more complete, or provides more actionable detail than the existing row.
+   * Fails open — defaults to "existing" on any error.
+   */
+  selectMaster(newSummary: string, existingSummary: string): Promise<"new" | "existing">;
 }
 
 /**

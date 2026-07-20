@@ -84,6 +84,8 @@ class StubNotionWriter implements NotionWriter {
   async getPageSummaries(): Promise<Array<{ pageId: string; summary: string }>> {
     return [];
   }
+
+  async relinkRelatedFeedback(_masterPageId: string, _childPageId: string): Promise<void> {}
 }
 
 class StubDedupStore implements DedupStore {
@@ -127,6 +129,9 @@ function makeNullSimilarityDetector(): SimilarityDetector {
   return {
     async findSimilar() {
       return null;
+    },
+    async selectMaster() {
+      return "existing" as const;
     },
   };
 }

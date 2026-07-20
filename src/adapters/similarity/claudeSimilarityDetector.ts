@@ -80,9 +80,55 @@ export class ClaudeSimilarityDetector implements SimilarityDetector {
       const input = toolUse.input as { matchedId: string; rationale: string };
       if (!input.rationale || input.matchedId === NONE || !validIds.includes(input.matchedId)) return null;
 
-      return { matchedPageId: input.matchedId, rationale: input.rationale };
+      const matched = candidates.find((c) => c.pageId === input.matchedId);
+      return {
+        matchedPageId: input.matchedId,
+        rationale: input.rationale,
+        matchedSummary: matched?.summary,
+      };
     } catch {
       return null;
+    }
+  }
+
+  async selectMaster(newSummary: string, existingSummary: string): Promise<"new" | "existing"> {
+    try {
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 128,
+        system: `You decide which of two feedback summaries is the better canonical record of a reported issue — more specific, more complete, and more actionable. Output exactly one word: "first" or "second".`,
+        messages: [
+          {
+            role: "user",
+            content: `Summary A (new capture): ${newSummary}\n\nSummary B (existing record): ${existingSummary}\n\nWhich is more complete and specific?`,
+          },
+        ],
+        tools: [
+          {
+            name: "submit_master",
+            description: "Submit which summary should be the canonical master record.",
+            input_schema: {
+              type: "object" as const,
+              properties: {
+                master: {
+                  type: "string",
+                  enum: ["first", "second"],
+                  description: "\"first\" = new capture is better master; \"second\" = existing record stays master",
+                },
+              },
+              required: ["master"],
+            },
+          },
+        ],
+        tool_choice: { type: "tool", name: "submit_master" },
+      });
+
+      const toolUse = response.content.find((b) => b.type === "tool_use");
+      if (!toolUse || toolUse.type !== "tool_use") return "existing";
+      const { master } = toolUse.input as { master: string };
+      return master === "first" ? "new" : "existing";
+    } catch {
+      return "existing";
     }
   }
 }

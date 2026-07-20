@@ -34,6 +34,7 @@ function makeDeps() {
       appendFlagger: async () => {},
       findRecentByCategories: async () => [],
       updateSiblingLinks: async () => {},
+      relinkRelatedFeedback: async () => {},
     },
     slack: {
       resolveUserName: async (id) => id === "Ureply" ? "Carol" : "Unknown",
