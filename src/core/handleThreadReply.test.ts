@@ -117,3 +117,26 @@ test("empty route result — no updates written", async () => {
   await handleThreadReply("C123", "parent_ts", "reply_ts", "Ureply", "Generic reply.", [], deps);
   assert.strictEqual(loggedUpdates.length, 0);
 });
+
+test("batch-split parent — thread reply routes to specific row only, not all rows", async () => {
+  const { deps, loggedUpdates } = makeDeps();
+
+  // Simulate a message split into 3 rows (A, B, C)
+  deps.dedup.getPageIds = (k) => k === "C123:parent_ts" ? ["page_A", "page_B", "page_C"] : [];
+  deps.notion.getPageSummaries = async (pageIds) => [
+    { pageId: "page_A", summary: "Bulk candidate assignment missing." },
+    { pageId: "page_B", summary: "Export button throws an error." },
+    { pageId: "page_C", summary: "GDPR data deletion needed." },
+  ];
+
+  // Router decides the reply is only about page_B (the export bug)
+  deps.threadRouter.route = async (_text, _images, _candidates) => [
+    { pageId: "page_B", relevance: "primary" as const, rationale: "Reply is about the export error." },
+  ];
+
+  await handleThreadReply("C123", "parent_ts", "reply_ts", "Ureply", "The export error also happens on Safari.", [], deps);
+
+  // Only page_B should be updated — not page_A or page_C
+  assert.strictEqual(loggedUpdates.length, 1);
+  assert.strictEqual(loggedUpdates[0].pageId, "page_B");
+});
