@@ -156,6 +156,7 @@ export async function handleCapture(
           relatedFeedbackPageId: relatedMatch?.matchedPageId,
           relatedFeedbackRationale: relatedMatch?.rationale,
           status: req.initialStatus,
+          title: enrichment.title,
         });
         pageIds.push(pageId);
       }
@@ -233,6 +234,7 @@ export async function handleCapture(
         relatedFeedbackPageId: relatedMatch?.matchedPageId,
         relatedFeedbackRationale: relatedMatch?.rationale,
         status: req.initialStatus,
+        title: enrichment?.title,
       });
 
       dedup.record(key, pageId);

@@ -89,15 +89,18 @@ export class LocalFeedbackWriter implements NotionWriter {
     replyTs: string,
     _images?: ImageAttachment[],
   ): Promise<void> {
+    const childId = `local_thread_${++localIdSeq}_${Date.now()}`;
     const line = JSON.stringify({
       capturedAt: new Date().toISOString(),
-      event: "thread_log_appended",
-      pageId,
+      event: "thread_child_created",
+      parentPageId: pageId,
+      childPageId: childId,
       replyAuthorName,
       replyTs,
       replyText,
+      title: `Thread: ${replyText.slice(0, 80)}`,
     });
     appendFileSync(this.filePath, line + "\n", "utf8");
-    this.logger.info("Thread log appended (local)", { pageId });
+    this.logger.info("Thread child created (local)", { parentPageId: pageId, childPageId: childId });
   }
 }

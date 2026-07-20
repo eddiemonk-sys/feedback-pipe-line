@@ -70,6 +70,8 @@ export interface FeedbackRecord {
   clientCompany?: string;
   /** Primary audience persona for this feedback item (Granola ingestion). */
   audience?: "Recruiter" | "Talent Leader" | "Candidate" | "Worker" | "Admin" | "Unknown";
+  /** 5–10 word headline for quick scanning in the Notion table. */
+  title?: string;
 }
 
 export interface NotionWriter {
@@ -168,6 +170,8 @@ export interface LLMToolCall {
 }
 
 export interface EnrichmentResult {
+  /** 5–10 word headline capturing the core feedback point. */
+  title?: string;
   summary: string;
   /** 1–2 AI-assigned categories. Never empty. */
   categories: FeedbackCategory[];

@@ -50,6 +50,10 @@ export class Enricher implements EnricherPort {
                     type: "string",
                     description: "1-2 sentences: which signals drove your category choice and why you ruled out the closest alternative.",
                   },
+                  title: {
+                    type: "string",
+                    description: "5-10 word headline for the feedback (e.g. 'Export button throws error on click', 'GDPR data deletion needed by Q3', 'Bulk candidate assignment missing'). No filler words. No punctuation at the end.",
+                  },
                   summary: {
                     type: "string",
                     description: "Lead sentence naming the most important point, followed by 2-4 bullet points (•). Format: 'Lead sentence.\\n• Bullet 1\\n• Bullet 2'. Each bullet adds a distinct point — no repeats.",
@@ -80,7 +84,7 @@ export class Enricher implements EnricherPort {
                     description: "Optional. Zero-based indices of images (from the message) that explicitly reference this item. Leave absent if attribution is ambiguous.",
                   },
                 },
-                required: ["reasoning", "summary", "categories"],
+                required: ["reasoning", "title", "summary", "categories"],
               },
             },
           },
@@ -96,6 +100,7 @@ export class Enricher implements EnricherPort {
 
     const { results } = input as { results: Array<{
       reasoning: string;
+      title?: string;
       summary: string;
       categories: string[];
       preambleContext?: string;
@@ -108,7 +113,7 @@ export class Enricher implements EnricherPort {
 
     const enrichments: EnrichmentResult[] = [];
     for (const item of results) {
-      const { summary, categories, preambleContext, clientName, mentionedUsers, imageIndices } = item;
+      const { title, summary, categories, preambleContext, clientName, mentionedUsers, imageIndices } = item;
       if (
         !summary ||
         !Array.isArray(categories) ||
@@ -119,6 +124,7 @@ export class Enricher implements EnricherPort {
         return null; // one invalid item invalidates the whole batch
 
       enrichments.push({
+        ...(title ? { title } : {}),
         summary,
         categories: categories as FeedbackCategory[],
         ...(preambleContext ? { preambleContext } : {}),

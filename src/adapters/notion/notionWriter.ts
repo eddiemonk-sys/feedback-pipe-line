@@ -96,6 +96,18 @@ export class NotionFeedbackWriter implements NotionWriter {
       },
     });
 
+    // Write Title as a best-effort update — fails open if the column doesn't exist in the DB yet.
+    if (r.title) {
+      await this.client.pages.update({
+        page_id: page.id,
+        properties: {
+          Title: { rich_text: [{ text: { content: r.title.slice(0, MAX_TEXT) } }] },
+        },
+      }).catch((err) => {
+        console.warn("[notionWriter] Title write failed (add Title column to DB):", err);
+      });
+    }
+
     // Embed the uploaded image as an inline page block (requires "Insert content" integration permission).
     // Fails open — a block append failure must never cause a capture loss.
     if (imageUploadId) {
@@ -219,8 +231,9 @@ export class NotionFeedbackWriter implements NotionWriter {
   ): Promise<void> {
     const timestamp = new Date(Number(replyTs) * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC";
     const newEntry = `[${timestamp}] ${replyAuthorName}: ${replyText}`;
+    const dateIso = new Date(Number(replyTs) * 1000).toISOString().slice(0, 10);
 
-    // Read current "Thread Replies" property value so we can append to it (fail-open on retrieve error)
+    // 1. Append to "Thread Replies" text property on the parent (quick-scan log).
     let current = "";
     try {
       const page = await this.client.pages.retrieve({ page_id: pageId });
@@ -228,42 +241,78 @@ export class NotionFeedbackWriter implements NotionWriter {
         ((page as any).properties as Record<string, any>)["Thread Replies"]
           ?.rich_text?.[0]?.plain_text ?? "";
     } catch {
-      // fail-open: write new entry alone if the retrieve fails
+      // fail-open
     }
-
     const combined = current ? `${current}\n${newEntry}` : newEntry;
-    // Trim from the start to stay within the Notion property limit — most-recent content is preserved
     const content = combined.length > MAX_TEXT ? combined.slice(combined.length - MAX_TEXT) : combined;
 
     await this.client.pages.update({
       page_id: pageId,
-      properties: {
-        "Thread Replies": {
-          rich_text: [{ text: { content } }],
-        },
-      },
+      properties: { "Thread Replies": { rich_text: [{ text: { content } }] } },
     });
 
-    // Images cannot live in a text property — append them as inline page blocks
-    if (images?.length) {
+    // 2. Create a child Notion row for this thread reply (master/child structure).
+    const childTitle = `Thread: ${replyText.slice(0, 80)}${replyText.length > 80 ? "…" : ""}`;
+    let childPageId: string | null = null;
+    try {
+      const childPage = await this.client.pages.create({
+        parent: { database_id: this.databaseId },
+        properties: {
+          Message: { title: [{ text: { content: replyText.slice(0, MAX_TEXT) } }] },
+          Author: { rich_text: [{ text: { content: replyAuthorName.slice(0, MAX_TEXT) } }] },
+          Date: { date: { start: dateIso } },
+          Source: { rich_text: [{ text: { content: "Thread Reply" } }] },
+          Channel: { rich_text: [] },
+          "Flagged By": { rich_text: [] },
+          "Message URL": { url: null },
+          "Customer/Account": { rich_text: [] },
+        },
+      });
+      childPageId = childPage.id;
+
+      // Write Title to child — best-effort (fails if column not yet in DB).
+      await this.client.pages.update({
+        page_id: childPageId,
+        properties: { Title: { rich_text: [{ text: { content: childTitle.slice(0, MAX_TEXT) } }] } },
+      }).catch((err) => console.warn("[notionWriter] child Title write failed:", err));
+    } catch (err) {
+      console.warn("[notionWriter] thread child page creation failed:", err);
+    }
+
+    // 3. Link child to parent's "Threads" relation — best-effort.
+    if (childPageId) {
+      try {
+        const parentPage = await this.client.pages.retrieve({ page_id: pageId });
+        const existing: Array<{ id: string }> =
+          ((parentPage as any).properties as Record<string, any>)["Threads"]?.relation ?? [];
+        await this.client.pages.update({
+          page_id: pageId,
+          properties: {
+            Threads: { relation: [...existing.map((r) => ({ id: r.id })), { id: childPageId }] },
+          },
+        });
+      } catch (err) {
+        console.warn("[notionWriter] Threads relation link failed (add Threads column to DB):", err);
+      }
+    }
+
+    // 4. Attach reply images to the child row (not the parent).
+    if (images?.length && childPageId) {
       const imageUploadIds = await Promise.all(
         images.map(async (img) => {
-          try {
-            return await uploadImageToNotion(this.apiKey, img);
-          } catch {
-            return null;
-          }
+          try { return await uploadImageToNotion(this.apiKey, img); }
+          catch { return null; }
         }),
       );
       const validIds = imageUploadIds.filter((id): id is string => id !== null);
       if (validIds.length > 0) {
         await (this.client.blocks.children as any).append({
-          block_id: pageId,
+          block_id: childPageId,
           children: validIds.map((id) => ({
             type: "image",
             image: { type: "file_upload", file_upload: { id } },
           })),
-        });
+        }).catch((err) => console.warn("[notionWriter] child image append failed:", err));
       }
     }
   }
