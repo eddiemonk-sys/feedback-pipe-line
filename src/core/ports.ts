@@ -86,8 +86,11 @@ export interface NotionWriter {
   updateSiblingLinks(pageId: string, siblingPageIds: string[]): Promise<void>;
 
   /**
-   * Appends a timestamped thread log block to the Notion page body for this reply.
-   * Fails open — a block append failure must never surface as a capture error.
+   * Appends a timestamped entry to the "Thread Replies" property of the Notion row.
+   * Format: `[YYYY-MM-DD HH:MM UTC] Author: reply text`. Multiple replies accumulate
+   * on separate lines; oldest entries are trimmed if the property limit is reached.
+   * Reply images are attached as inline page blocks (properties cannot hold images).
+   * Fails open — any failure must never surface as a capture error.
    */
   updateSummaryAndLog(
     pageId: string,

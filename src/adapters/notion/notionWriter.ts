@@ -218,22 +218,33 @@ export class NotionFeedbackWriter implements NotionWriter {
     images?: ImageAttachment[],
   ): Promise<void> {
     const timestamp = new Date(Number(replyTs) * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC";
-    const logEntry = `[${timestamp}] ${replyAuthorName}: ${replyText}`.slice(0, MAX_TEXT);
+    const newEntry = `[${timestamp}] ${replyAuthorName}: ${replyText}`;
 
-    // Append the thread log as a quote block
-    await (this.client.blocks.children as any).append({
-      block_id: pageId,
-      children: [
-        {
-          type: "quote",
-          quote: {
-            rich_text: [{ type: "text", text: { content: logEntry } }],
-          },
+    // Read current "Thread Replies" property value so we can append to it (fail-open on retrieve error)
+    let current = "";
+    try {
+      const page = await this.client.pages.retrieve({ page_id: pageId });
+      current =
+        ((page as any).properties as Record<string, any>)["Thread Replies"]
+          ?.rich_text?.[0]?.plain_text ?? "";
+    } catch {
+      // fail-open: write new entry alone if the retrieve fails
+    }
+
+    const combined = current ? `${current}\n${newEntry}` : newEntry;
+    // Trim from the start to stay within the Notion property limit — most-recent content is preserved
+    const content = combined.length > MAX_TEXT ? combined.slice(combined.length - MAX_TEXT) : combined;
+
+    await this.client.pages.update({
+      page_id: pageId,
+      properties: {
+        "Thread Replies": {
+          rich_text: [{ text: { content } }],
         },
-      ],
+      },
     });
 
-    // Append any reply images as inline image blocks
+    // Images cannot live in a text property — append them as inline page blocks
     if (images?.length) {
       const imageUploadIds = await Promise.all(
         images.map(async (img) => {

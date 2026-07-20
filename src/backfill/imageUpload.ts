@@ -21,7 +21,11 @@ export async function uploadImageToNotion(
       },
       body: JSON.stringify({}),
     });
-    if (!createRes.ok) return null;
+    if (!createRes.ok) {
+      const body = await createRes.text().catch(() => "");
+      console.warn(`[imageUpload] file_uploads create failed ${createRes.status}: ${body}`);
+      return null;
+    }
     const created = (await createRes.json()) as { id?: string; upload_url?: string };
     if (!created.id || !created.upload_url) return null;
 
@@ -39,10 +43,15 @@ export async function uploadImageToNotion(
       },
       body: form,
     });
-    if (!sendRes.ok) return null;
+    if (!sendRes.ok) {
+      const body = await sendRes.text().catch(() => "");
+      console.warn(`[imageUpload] file upload send failed ${sendRes.status}: ${body}`);
+      return null;
+    }
 
     return created.id;
-  } catch {
+  } catch (err) {
+    console.warn("[imageUpload] unexpected error:", err);
     return null;
   }
 }

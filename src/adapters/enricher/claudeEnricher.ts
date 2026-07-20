@@ -52,7 +52,7 @@ export class Enricher implements EnricherPort {
                   },
                   summary: {
                     type: "string",
-                    description: "1-2 sentence plain-English summary of the feedback",
+                    description: "Lead sentence naming the most important point, followed by 2-4 bullet points (•). Format: 'Lead sentence.\\n• Bullet 1\\n• Bullet 2'. Each bullet adds a distinct point — no repeats.",
                   },
                   categories: {
                     type: "array",
