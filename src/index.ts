@@ -230,6 +230,8 @@ async function main(): Promise<void> {
       onThreadReply,
       onChannelMessage,
       botUserId,
+      notionApiKey: config.notionApiKey,
+      notionDatabaseId: config.notionDatabaseId,
     },
     onCapture,
     logger,

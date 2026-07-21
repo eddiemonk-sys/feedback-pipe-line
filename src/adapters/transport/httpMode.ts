@@ -1,8 +1,11 @@
 import pkg from "@slack/bolt";
+import { readFileSync, existsSync, statSync } from "node:fs";
+import { extname, join } from "node:path";
 import type { CaptureRequest } from "../../core/events.js";
 import type { Logger } from "../../util/logger.js";
+import { FeedbackBoardReader, generateFeedbackDataJs } from "../api/feedbackBoardReader.js";
 
-const { App } = pkg;
+const { App, ExpressReceiver } = pkg;
 
 export interface HttpModeOptions {
   botToken: string;
@@ -28,6 +31,10 @@ export interface HttpModeOptions {
   ) => Promise<void>;
   /** Bot's own user ID — used to filter out the bot's own ack replies (R6 loop prevention). */
   botUserId?: string;
+  /** When set, serves the web feedback board at / and injects live Notion data at /feedback-data.js */
+  notionApiKey?: string;
+  /** Notion database ID for the board reader — required when notionApiKey is set. */
+  notionDatabaseId?: string;
 }
 
 /**
@@ -39,14 +46,57 @@ export interface HttpModeOptions {
  * Identical event logic to socketMode.ts — only the Bolt initialisation and
  * app.start() call differ. Switching back to Socket Mode = swap the import in index.ts.
  */
+const MIME: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js":   "application/javascript; charset=utf-8",
+  ".css":  "text/css; charset=utf-8",
+  ".png":  "image/png",
+  ".svg":  "image/svg+xml",
+  ".json": "application/json",
+  ".otf":  "font/otf",
+  ".woff2":"font/woff2",
+};
+
 export async function startHttpMode(
   options: HttpModeOptions,
   onCapture: (req: CaptureRequest) => Promise<void>,
   logger: Logger,
 ): Promise<void> {
+  const receiver = new ExpressReceiver({ signingSecret: options.signingSecret });
+
+  // --- Web board: serve web/ directory and inject live feedback-data.js ---
+  const webDir = join(process.cwd(), "web");
+  if (options.notionApiKey && options.notionDatabaseId) {
+    const boardReader = new FeedbackBoardReader(options.notionApiKey, options.notionDatabaseId);
+    receiver.router.get("/feedback-data.js", async (_req: any, res: any) => {
+      try {
+        const rows = await boardReader.readAllRows();
+        res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+        res.send(generateFeedbackDataJs(rows));
+      } catch (err) {
+        logger.error("Board reader failed — falling back to static feedback-data.js", { err: String(err) });
+        res.status(500).send("/* Error loading live data — reload to retry */");
+      }
+    });
+    logger.info("Web board: live /feedback-data.js enabled (reads Notion)");
+  }
+
+  if (existsSync(webDir)) {
+    receiver.router.use((req: any, res: any, next: any) => {
+      let urlPath: string = req.path;
+      if (urlPath === "/") urlPath = "/index.html";
+      const filePath = join(webDir, urlPath.replace(/\.\./g, ""));
+      if (!existsSync(filePath) || !statSync(filePath).isFile()) return next();
+      const mime = MIME[extname(filePath)] ?? "application/octet-stream";
+      res.setHeader("Content-Type", mime);
+      res.send(readFileSync(filePath));
+    });
+    logger.info(`Web board: serving static files from ${webDir}`);
+  }
+
   const app = new App({
     token: options.botToken,
-    signingSecret: options.signingSecret,
+    receiver,
   });
 
   app.event("reaction_added", async ({ event }) => {

@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/sz-marketing-ds-d7229a7f-ab4f-4e9b-87e6-05d71081074f/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/sz-marketing-ds-d7229a7f-ab4f-4e9b-87e6-05d71081074f/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/sz-marketing-ds-d7229a7f-ab4f-4e9b-87e6-05d71081074f/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/sz-marketing-ds-d7229a7f-ab4f-4e9b-87e6-05d71081074f/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/sz-marketing-ds-d7229a7f-ab4f-4e9b-87e6-05d71081074f/tokens/effects.css">
+  <link rel="stylesheet" href="_ds/sz-marketing-ds-d7229a7f-ab4f-4e9b-87e6-05d71081074f/tokens/base.css">
+  <link rel="stylesheet" href="_ds/sz-marketing-ds-d7229a7f-ab4f-4e9b-87e6-05d71081074f/styles.css">
+  <script src="_ds/sz-marketing-ds-d7229a7f-ab4f-4e9b-87e6-05d71081074f/_ds_bundle.js"></script>
+  <script src="feedback-data.js"></script>
+  <script src="image-slot.js"></script>
+  <style>
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; height:100%; }
+    body{ font-family:var(--font-body); color:var(--text-body); background:var(--sz-white); -webkit-font-smoothing:antialiased; }
+    a{ color:var(--text-link); text-decoration:none; }
+    a:hover{ text-decoration:underline; }
+    .fb-scroll::-webkit-scrollbar{ width:10px; height:10px; }
+    .fb-scroll::-webkit-scrollbar-thumb{ background:var(--sz-grey-200); border-radius:999px; border:2px solid #fff; }
+    input:focus-visible, button:focus-visible{ outline:3px solid var(--focus-ring); outline-offset:2px; }
+    @keyframes fbFade{ from{ opacity:0; transform:translateY(4px);} to{ opacity:1; transform:none;} }
+    @keyframes fbToast{ from{ opacity:0; transform:transl(-50%,8px);} to{ opacity:1; transform:translateX(-50%);} }
+    mark{ background:var(--sz-yellow); color:inherit; padding:0 .12em; border-radius:2px; }
+  </style>
+</helmet>
+<div style="display:flex; height:100vh; width:100%; overflow:hidden; font-size:15px;" data-screen-label="Feedback Board — Dense List">
+
+  <!-- ============ LEFT NAV ============ -->
+  <aside class="fb-scroll" style="width:264px; flex:none; height:100%; overflow-y:auto; background:var(--sz-grey-050); border-right:1px solid var(--border-hairline); padding:18px 14px; display:flex; flex-direction:column; gap:6px;">
+    <div style="display:flex; align-items:center; gap:10px; padding:4px 8px 14px;">
+      <img src="assets/symbol/symbol-blue1.png" alt="" aria-hidden="true" style="width:26px; height:26px; display:block;" />
+      <span style="font-family:var(--font-display); font-weight:700; font-size:15px; color:var(--text-strong); letter-spacing:-.01em;">Customer Feedback</span>
+    </div>
+
+    <sc-for list="{{ navItems }}" as="nav" hint-placeholder-count="3">
+      <button onClick="{{ nav.go }}" style="{{ nav.style }}">
+        <span style="display:flex; align-items:center; gap:9px;">
+          <span style="{{ nav.iconStyle }}"></span>
+          <span>{{ nav.label }}</span>
+        </span>
+        <span style="{{ nav.countStyle }}">{{ nav.count }}</span>
+      </button>
+    </sc-for>
+
+    <div style="height:1px; background:var(--border-hairline); margin:12px 6px;"></div>
+    <div style="font-family:var(--font-display); font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--sz-grey-400); padding:2px 8px 8px;">Crews</div>
+    <sc-for list="{{ crewItems }}" as="crew" hint-placeholder-count="3">
+      <button onClick="{{ crew.go }}" style="{{ crew.style }}">
+        <span style="display:flex; align-items:center; gap:9px;">
+          <span style="width:9px; height:9px; border-radius:50%; background:{{ crew.dot }};"></span>
+          <span>{{ crew.label }}</span>
+        </span>
+        <span style="{{ crew.countStyle }}">{{ crew.count }}</span>
+      </button>
+    </sc-for>
+
+    <div style="height:1px; background:var(--border-hairline); margin:12px 6px;"></div>
+    <div style="font-family:var(--font-display); font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--sz-grey-400); padding:2px 8px 8px;">Filters</div>
+
+    <sc-for list="{{ facets }}" as="facet" hint-placeholder-count="4">
+      <div style="margin-bottom:2px;">
+        <button onClick="{{ facet.toggle }}" style="width:100%; display:flex; align-items:center; justify-content:space-between; background:none; border:none; cursor:pointer; padding:7px 8px; font-family:var(--font-display); font-weight:500; font-size:13px; color:var(--sz-grey-700);">
+          <span>{{ facet.label }}</span>
+          <span style="{{ facet.chevStyle }}">›</span>
+        </button>
+        <sc-if value="{{ facet.open }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:2px 8px 8px;">
+            <sc-for list="{{ facet.options }}" as="opt" hint-placeholder-count="3">
+              <label style="{{ opt.rowStyle }}">
+                <span style="{{ opt.boxStyle }}">{{ opt.tick }}</span>
+                <span style="flex:1;">{{ opt.label }}</span>
+                <span style="color:var(--sz-grey-400); font-size:11px; font-variant-numeric:tabular-nums;">{{ opt.count }}</span>
+              </label>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+
+    <div style="margin:4px 8px 8px;">
+      <div style="font-family:var(--font-display); font-weight:500; font-size:13px; color:var(--sz-grey-700); padding:7px 0;">Client company</div>
+      <input value="{{ filters.client }}" onInput="{{ onClientInput }}" placeholder="Filter by company…" style="width:100%; border:1px solid var(--border-hairline); border-radius:8px; padding:8px 10px; font-family:var(--font-body); font-size:13px; background:#fff; color:var(--text-strong);" />
+    </div>
+    <div style="margin:0 8px 8px;">
+      <div style="font-family:var(--font-display); font-weight:500; font-size:13px; color:var(--sz-grey-700); padding:7px 0;">Date range</div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px;">
+        <sc-for list="{{ datePresets }}" as="d" hint-placeholder-count="4">
+          <button onClick="{{ d.set }}" style="{{ d.style }}">{{ d.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="fb-scroll" style="flex:1; height:100%; overflow-y:auto; background:var(--sz-white); position:relative;">
+
+    <!-- header -->
+    <div style="position:sticky; top:0; z-index:20; background:rgba(255,255,255,.86); backdrop-filter:blur(10px); border-bottom:1px solid var(--border-hairline); padding:16px 28px 12px;">
+      <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:baseline; gap:12px;">
+          <h1 style="font-family:var(--font-display); font-weight:700; font-size:26px; letter-spacing:-.01em; color:var(--text-strong); margin:0;">{{ viewTitle }}</h1>
+          <span style="font-size:14px; color:var(--sz-grey-500);">{{ countLabel }}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="position:relative; display:flex; align-items:center;">
+            <span style="position:absolute; left:11px; color:var(--sz-grey-400); display:flex;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></span>
+            <input value="{{ filters.search }}" onInput="{{ onSearchInput }}" placeholder="Search title, summary, message…" style="width:280px; border:1px solid var(--border-hairline); border-radius:999px; padding:8px 14px 8px 32px; font-family:var(--font-body); font-size:13.5px; background:#fff; color:var(--text-strong);" />
+          </div>
+          <div style="position:relative;">
+            <select value="{{ sort }}" onChange="{{ onSortChange }}" style="appearance:none; border:1px solid var(--border-hairline); border-radius:999px; padding:8px 30px 8px 14px; font-family:var(--font-display); font-weight:500; font-size:13px; color:var(--sz-grey-700); background:#fff; cursor:pointer;">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="most-raised">Most raised</option>
+              <option value="needs-review">Needs Review first</option>
+            </select>
+            <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--sz-grey-400); font-size:12px;">▾</span>
+          </div>
+          <button disabled="true" title="Coming soon" style="border:1px dashed var(--border-strong); border-radius:999px; padding:8px 14px; font-family:var(--font-display); font-weight:500; font-size:13px; color:var(--sz-grey-400); background:#fff; cursor:not-allowed;">Save this view · Soon</button>
+        </div>
+      </div>
+
+      <!-- active chips -->
+      <sc-if value="{{ hasActiveChips }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:12px;">
+          <sc-for list="{{ activeChips }}" as="chip" hint-placeholder-count="2">
+            <button onClick="{{ chip.remove }}" style="display:inline-flex; align-items:center; gap:6px; background:var(--sz-blue-050); color:var(--sz-blue-700); border:none; border-radius:999px; padding:5px 10px; font-family:var(--font-display); font-weight:500; font-size:12.5px; cursor:pointer;">
+              <span>{{ chip.label }}</span><span style="font-size:13px; opacity:.7;">×</span>
+            </button>
+          </sc-for>
+          <button onClick="{{ clearAll }}" style="background:none; border:none; color:var(--sz-grey-500); font-family:var(--font-display); font-weight:500; font-size:12.5px; cursor:pointer; text-decoration:underline;">Clear all</button>
+        </div>
+      </sc-if>
+    </div>
+
+    <!-- ===== NEEDS REVIEW / TRIAGE VIEW ===== -->
+    <sc-if value="{{ isTriage }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:20px 28px 80px; max-width:1000px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+          <p style="margin:0; font-size:14px; color:var(--sz-grey-500); max-width:560px;">Work top to bottom and clear to zero. Pipeline internals stay open here so you can judge the AI output.</p>
+          <div style="display:flex; gap:8px;">
+            <button onClick="{{ openCmdk }}" style="display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border-hairline); background:#fff; border-radius:8px; padding:7px 11px; font-family:var(--font-display); font-weight:500; font-size:12.5px; color:var(--sz-grey-700); cursor:pointer;">⌘K Command</button>
+            <button onClick="{{ openShortcuts }}" style="border:1px solid var(--border-hairline); background:#fff; border-radius:8px; padding:7px 11px; font-family:var(--font-display); font-weight:500; font-size:12.5px; color:var(--sz-grey-700); cursor:pointer;">Shortcuts ?</button>
+          </div>
+        </div>
+
+        <sc-if value="{{ triageEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center; padding:80px 20px; animation:fbFade .3s var(--ease-out,ease);">
+            <div style="width:56px; height:56px; border-radius:50%; background:var(--sz-blue-050); display:flex; align-items:center; justify-content:center; margin:0 auto 16px; color:var(--sz-blue);"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+            <h3 style="font-family:var(--font-display); font-weight:700; font-size:20px; color:var(--text-strong); margin:0 0 6px;">Inbox zero</h3>
+            <p style="margin:0; color:var(--sz-grey-500); font-size:14px;">Every item reviewed. Nice work.</p>
+          </div>
+        </sc-if>
+
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <sc-for list="{{ triageList }}" as="row" hint-placeholder-count="3">
+            <div style="{{ row.triageCardStyle }}">
+              <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">
+                <div style="flex:1; min-width:0;">
+                  <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                    <span style="width:8px; height:8px; border-radius:50%; background:{{ row.statusColor }};"></span>
+                    <span style="font-family:var(--font-display); font-weight:700; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:{{ row.statusColor }};">{{ row.status }}</span>
+                    <span style="{{ row.confChipStyle }}">{{ row.confChipLabel }}</span>
+                  </div>
+                  <h3 style="font-family:var(--font-display); font-weight:700; font-size:17px; letter-spacing:-.01em; color:var(--text-strong); margin:0 0 8px; line-height:1.25;">{{ row.title }}</h3>
+                  <ul style="margin:0 0 10px; padding-left:16px; display:flex; flex-direction:column; gap:3px;">
+                    <sc-for list="{{ row.bullets }}" as="b" hint-placeholder-count="2"><li style="font-size:13.5px; color:var(--sz-grey-700); line-height:1.45;">{{ b }}</li></sc-for>
+                  </ul>
+                  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:2px;">
+                    <sc-for list="{{ row.pills }}" as="pill" hint-placeholder-count="2"><span style="{{ pill.style }}">{{ pill.label }}</span></sc-for>
+                    <span style="font-size:12.5px; color:var(--sz-grey-500);">{{ row.metaLine }}</span>
+                  </div>
+                </div>
+                <span style="{{ row.sourceStyle }}">{{ row.sourceLabel }}</span>
+              </div>
+
+              <div style="margin-top:12px; padding:12px 14px; background:var(--sz-grey-050); border:1px solid var(--border-hairline); border-radius:8px;">
+                <div style="font-family:var(--font-display); font-weight:700; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sz-grey-400); margin-bottom:6px;">Pipeline</div>
+                <div style="font-size:13px; color:var(--sz-grey-700); line-height:1.5;"><strong style="color:var(--text-strong);">Judge:</strong> {{ row.judge }}</div>
+                <div style="font-size:13px; color:var(--sz-grey-700); margin-top:2px;"><strong style="color:var(--text-strong);">Confidence:</strong> {{ row.confidence }} · <strong style="color:var(--text-strong);">Flagged by:</strong> {{ row.flaggedBy }}</div>
+              </div>
+
+              <div style="display:flex; align-items:center; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                <button onClick="{{ row.approve }}" style="display:inline-flex; align-items:center; gap:7px; background:var(--sz-blue); color:#fff; border:none; border-radius:999px; padding:8px 15px; font-family:var(--font-display); font-weight:700; font-size:13px; cursor:pointer; box-shadow:var(--shadow-blue,0 4px 14px rgba(0,106,255,.25));"><kbd style="background:rgba(255,255,255,.22); border-radius:4px; padding:1px 5px; font-family:inherit; font-size:11px;">A</kbd> Approve</button>
+                <button onClick="{{ row.edit }}" style="display:inline-flex; align-items:center; gap:7px; background:#fff; color:var(--sz-ink); border:1px solid var(--border-strong); border-radius:999px; padding:8px 15px; font-family:var(--font-display); font-weight:500; font-size:13px; cursor:pointer;"><kbd style="background:var(--sz-grey-100); border-radius:4px; padding:1px 5px; font-family:inherit; font-size:11px;">E</kbd> Edit summary</button>
+                <button onClick="{{ row.dismiss }}" style="display:inline-flex; align-items:center; gap:7px; background:#fff; color:var(--status-error); border:1px solid var(--border-strong); border-radius:999px; padding:8px 15px; font-family:var(--font-display); font-weight:500; font-size:13px; cursor:pointer;"><kbd style="background:var(--sz-grey-100); border-radius:4px; padding:1px 5px; font-family:inherit; font-size:11px;">D</kbd> Dismiss</button>
+                <button onClick="{{ row.snooze }}" style="display:inline-flex; align-items:center; gap:7px; background:#fff; color:var(--sz-grey-700); border:1px solid var(--border-strong); border-radius:999px; padding:8px 15px; font-family:var(--font-display); font-weight:500; font-size:13px; cursor:pointer;"><kbd style="background:var(--sz-grey-100); border-radius:4px; padding:1px 5px; font-family:inherit; font-size:11px;">S</kbd> Snooze</button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ===== STANDARD LIST VIEW ===== -->
+    <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:0 0 100px;">
+        <sc-if value="{{ crewHeaderShown }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:18px 28px; background:var(--sz-blue); color:#fff; margin:0;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+              <div>
+                <div style="font-family:var(--font-display); font-weight:700; font-size:20px; letter-spacing:-.01em;">Crew: Indigo</div>
+                <div style="font-size:13px; opacity:.85; margin-top:2px;">{{ crewSubLabel }}</div>
+              </div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <span style="background:rgba(255,255,255,.16); border-radius:999px; padding:5px 12px; font-family:var(--font-display); font-weight:500; font-size:12.5px;">Candidate portal</span>
+                <span style="background:rgba(255,255,255,.16); border-radius:999px; padding:5px 12px; font-family:var(--font-display); font-weight:500; font-size:12.5px;">Assessment delivery</span>
+                <span style="background:rgba(255,255,255,.16); border-radius:999px; padding:5px 12px; font-family:var(--font-display); font-weight:500; font-size:12.5px;">Scoring engine</span>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-for list="{{ list }}" as="row" hint-placeholder-count="6">
+          <div style="{{ row.wrapStyle }}">
+
+            <!-- BATCH split header -->
+            <sc-if value="{{ row.isBatch }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:14px 24px 10px;">
+                <button onClick="{{ row.toggle }}" style="display:flex; width:100%; text-align:left; gap:10px; background:none; border:none; cursor:pointer; padding:0; align-items:flex-start;">
+                  <span style="flex:none; width:24px; height:24px; border-radius:6px; background:var(--sz-grey-100); display:flex; align-items:center; justify-content:center; color:var(--sz-grey-500); font-size:13px;">✂</span>
+                  <span style="flex:1; min-width:0;">
+                    <span style="display:block; font-family:var(--font-display); font-weight:700; font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--sz-grey-400); margin-bottom:3px;">Split into {{ row.siblingCount }} · {{ row.metaLine }}</span>
+                    <span style="display:block; font-size:13.5px; color:var(--sz-grey-700); line-height:1.45;">{{ row.original }}</span>
+                  </span>
+                  <span style="{{ row.sourceStyle }}">{{ row.sourceLabel }}</span>
+                </button>
+                <div style="margin-top:12px; display:flex; flex-direction:column; gap:2px; border-left:2px solid var(--border-hairline); padding-left:14px; margin-left:11px;">
+                  <sc-for list="{{ row.siblings }}" as="sib" hint-placeholder-count="3">
+                    <div style="padding:10px 0; border-bottom:1px solid var(--border-hairline);">
+                      <button onClick="{{ sib.toggle }}" style="display:flex; width:100%; text-align:left; align-items:center; gap:8px; background:none; border:none; padding:0; cursor:pointer; margin-bottom:4px;">
+                        <span style="width:7px; height:7px; border-radius:50%; background:{{ sib.statusColor }}; flex:none;"></span>
+                        <span style="font-family:var(--font-display); font-weight:700; font-size:15.5px; color:var(--text-strong); letter-spacing:-.01em; line-height:1.3; flex:1;">{{ sib.title }}</span>
+                        <sc-if value="{{ sib.hasThreads }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex; align-items:center; gap:5px; background:#e7f4ee; color:#1f7a52; border-radius:999px; padding:3px 9px; font-family:var(--font-display); font-weight:700; font-size:11.5px; flex:none;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>{{ sib.repliesLabel }}</span><span style="{{ sib.caretStyle }}">▾</span></sc-if>
+                      </button>
+                      <div style="font-size:13px; color:var(--sz-grey-700); line-height:1.4; margin-bottom:6px; padding-left:15px;">{{ sib.summary0 }}</div>
+                      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-left:15px;">
+                        <sc-for list="{{ sib.pills }}" as="pill" hint-placeholder-count="1"><span style="{{ pill.style }}">{{ pill.label }}</span></sc-for>
+                        <span style="font-size:12px; color:var(--sz-grey-500);">{{ sib.meta }}</span>
+                      </div>
+                      <sc-if value="{{ sib.open }}" hint-placeholder-val="{{ false }}">
+                        <div style="margin:9px 0 2px 15px; background:var(--sz-grey-050); border:1px solid var(--border-hairline); border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:9px; animation:fbFade .18s var(--ease-out,ease);">
+                          <sc-for list="{{ sib.threads }}" as="t" hint-placeholder-count="1">
+                            <div>
+                              <div style="display:flex; align-items:center; gap:8px;"><span style="font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--text-strong);">{{ t.author }}</span><span style="font-size:12px; color:var(--sz-grey-400);">{{ t.rel }}</span></div>
+                              <div style="font-size:13px; color:var(--sz-grey-700); line-height:1.45; margin-top:2px;">{{ t.text }}</div>
+                              <sc-if value="{{ t.hasMedia }}" hint-placeholder-val="{{ false }}"><div style="margin-top:7px; position:relative; width:46px; height:34px;"><image-slot id="{{ t.mediaSlotId }}" shape="rounded" radius="6" placeholder="img" style="width:46px; height:34px;"></image-slot><button onClick="{{ t.openMedia }}" title="Expand thread + image" style="position:absolute; top:2px; right:2px; width:16px; height:16px; border-radius:4px; background:rgba(10,10,11,.6); color:#fff; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:9px; padding:0;">⤢</button></div></sc-if>
+                            </div>
+                          </sc-for>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- NORMAL / MASTER / THREAD row -->
+            <sc-if value="{{ row.isStandard }}" hint-placeholder-val="{{ true }}">
+              <div style="{{ row.bodyPad }}" onClick="{{ row.onRowClick }}">
+                <div style="display:flex; gap:12px; align-items:flex-start;">
+                  <span style="flex:none; margin-top:6px; width:9px; height:9px; border-radius:50%; background:{{ row.statusColor }};" title="{{ row.status }}"></span>
+                  <div style="flex:1; min-width:0;">
+                    <div style="display:flex; align-items:flex-start; gap:10px; justify-content:space-between;">
+                      <button onClick="{{ row.toggle }}" style="text-align:left; background:none; border:none; padding:0; cursor:pointer; flex:1; min-width:0;">
+                        <span style="display:block; font-family:var(--font-display); font-weight:700; font-size:15.5px; letter-spacing:-.01em; color:var(--text-strong); line-height:1.3;">{{ row.titleNode }}</span>
+                      </button>
+                      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex:none;">
+                        <div style="display:flex; align-items:center; gap:7px;">
+                          <sc-if value="{{ row.hasMedia }}" hint-placeholder-val="{{ false }}">
+                            <div style="position:relative; width:38px; height:26px; flex:none;">
+                              <sc-if value="{{ row.mediaIsImage }}" hint-placeholder-val="{{ true }}"><image-slot id="{{ row.mediaSlotId }}" shape="rounded" radius="6" placeholder="" style="width:38px; height:26px;"></image-slot></sc-if>
+                              <sc-if value="{{ row.mediaIsVideo }}" hint-placeholder-val="{{ false }}"><button onClick="{{ row.openMedia }}" title="Play video" style="width:38px; height:26px; border-radius:6px; border:1px solid var(--border-hairline); background:linear-gradient(135deg,var(--sz-grey-200),var(--sz-grey-100)); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;"><span style="width:16px; height:16px; border-radius:50%; background:rgba(10,10,11,.6); color:#fff; display:flex; align-items:center; justify-content:center; font-size:7px;">▶</span></button></sc-if>
+                              <sc-if value="{{ row.mediaIsImage }}" hint-placeholder-val="{{ true }}"><button onClick="{{ row.openMedia }}" title="Expand" style="position:absolute; top:2px; right:2px; width:14px; height:14px; border-radius:4px; background:rgba(10,10,11,.6); color:#fff; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:8px; padding:0;">⤢</button></sc-if>
+                            </div>
+                          </sc-if>
+                          <sc-if value="{{ row.showConf }}" hint-placeholder-val="{{ false }}"><span style="{{ row.confChipStyle }}">{{ row.confChipLabel }}</span></sc-if>
+                          <a href="{{ row.messageUrl }}" target="_blank" title="Open source" style="display:flex; color:var(--sz-grey-400);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg></a>
+                          <span style="{{ row.sourceStyle }}">{{ row.sourceLabel }}</span>
+                        </div>
+                        <sc-if value="{{ row.isNeedsReview }}" hint-placeholder-val="{{ false }}">
+                          <button onClick="{{ row.goNeedsReview }}" title="Open in Needs Review" style="display:inline-flex; align-items:center; gap:6px; background:#fdefe2; color:#a2530f; border:1px solid #f0c48a; border-radius:999px; padding:4px 10px; font-family:var(--font-display); font-weight:700; font-size:11.5px; cursor:pointer; white-space:nowrap;"><span style="width:6px; height:6px; border-radius:50%; background:#e07a2f; flex:none;"></span>Needs Review</button>
+                        </sc-if>
+                      </div>
+                    </div>
+
+                    <ul style="margin:6px 0 9px; padding-left:16px; display:flex; flex-direction:column; gap:2px;">
+                      <sc-for list="{{ row.bulletNodes }}" as="b" hint-placeholder-count="2"><li style="font-size:13.5px; color:var(--sz-grey-700); line-height:1.45;">{{ b }}</li></sc-for>
+                    </ul>
+
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                      <sc-for list="{{ row.pills }}" as="pill" hint-placeholder-count="2"><span style="{{ pill.style }}">{{ pill.label }}</span></sc-for>
+                      <span style="flex:1;"></span>
+                      <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--sz-grey-500);"><span style="width:7px;height:7px;border-radius:50%;background:var(--sz-blue);opacity:.5;"></span>{{ row.crewLabel }}</span>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:9px;">
+                      <span style="font-size:12.5px; color:var(--sz-grey-500);">{{ row.metaLine }}</span>
+                      <button onClick="{{ row.toggleRaised }}" title="Show who raised this" style="{{ row.demandBtnStyle }}">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 7h12M8 12h12M8 17h12M3 7h.01M3 12h.01M3 17h.01"/></svg>
+                        {{ row.demandLabel }}
+                        <span style="{{ row.raisedCaretStyle }}">▾</span>
+                      </button>
+                      <sc-if value="{{ row.hasReplies }}" hint-placeholder-val="{{ false }}">
+                        <button onClick="{{ row.toggle }}" title="Show thread" style="display:inline-flex; align-items:center; gap:6px; background:#e7f4ee; color:#1f7a52; border:none; border-radius:999px; padding:4px 10px; font-family:var(--font-display); font-weight:700; font-size:12px; cursor:pointer;">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                          {{ row.repliesLabel }}
+                        </button>
+                      </sc-if>
+                      <sc-for list="{{ row.jira }}" as="j" hint-placeholder-count="0">
+                        <a href="{{ j.url }}" target="_blank" title="{{ j.hover }}" style="display:inline-flex; align-items:center; gap:6px; background:#fff; border:1px solid var(--border-strong); border-radius:999px; padding:3px 9px 3px 7px; font-family:var(--font-display); font-weight:700; font-size:11.5px; color:var(--sz-grey-700); text-decoration:none;">
+                          <span style="{{ j.iconStyle }}">{{ j.icon }}</span>
+                          <span style="color:var(--text-strong);">{{ j.key }}</span>
+                          <span style="{{ j.statusStyle }}">{{ j.status }}</span>
+                        </a>
+                      </sc-for>
+                      <span style="flex:1;"></span>
+                      <div class="fb-hoveractions" style="display:flex; align-items:center; gap:4px;">
+                        <button onClick="{{ row.openJira }}" title="Link a Jira issue" style="background:none; border:none; cursor:pointer; color:var(--sz-grey-400); padding:4px; border-radius:6px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></button>
+                        <button onClick="{{ row.openLink }}" title="Link related feedback" style="background:none; border:none; cursor:pointer; color:var(--sz-grey-400); padding:4px; border-radius:6px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg></button>
+                        <button onClick="{{ row.toggle }}" title="Expand" style="background:none; border:none; cursor:pointer; color:var(--sz-grey-400); padding:4px; border-radius:6px;"><span style="{{ row.chevStyle }}">▾</span></button>
+                      </div>
+                    </div>
+
+                    <!-- RAISED-BY REVEAL (click "Raised N×") -->
+                    <sc-if value="{{ row.raisedOpen }}" hint-placeholder-val="{{ false }}">
+                      <div style="margin-top:9px; background:var(--sz-blue-050); border:1px solid #cfe0ff; border-radius:10px; padding:10px 13px; animation:fbFade .18s var(--ease-out,ease);">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:7px;">
+                          <span style="font-family:var(--font-display); font-weight:700; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--sz-blue-700);">{{ row.raisedHeading }}</span>
+                          <span style="{{ row.verifStyle }}">{{ row.verifLabel }}</span>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:6px;">
+                          <sc-for list="{{ row.raisedList }}" as="rc" hint-placeholder-count="2">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                              <span style="width:6px; height:6px; border-radius:50%; background:var(--sz-blue);"></span>
+                              <span style="font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--text-strong);">{{ rc.client }}</span>
+                              <span style="{{ rc.audStyle }}">{{ rc.audience }}</span>
+                              <span style="font-size:12px; color:var(--sz-grey-500);">{{ rc.rel }}</span>
+                            </div>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <!-- EXPANDED PANEL -->
+                    <sc-if value="{{ row.expanded }}" hint-placeholder-val="{{ false }}">
+                      <div style="margin-top:12px; animation:fbFade .2s var(--ease-out,ease);">
+
+                        <!-- children (master) -->
+                        <sc-if value="{{ row.hasDemand }}" hint-placeholder-val="{{ false }}">
+                          <div style="border-left:2px solid var(--sz-blue-050); padding-left:14px; margin:0 0 12px; display:flex; flex-direction:column; gap:10px;">
+                            <sc-for list="{{ row.children }}" as="ch" hint-placeholder-count="2">
+                              <div>
+                                <div style="display:flex; align-items:center; gap:8px; margin-bottom:3px;">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--sz-blue)" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>
+                                  <span style="font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--text-strong);">{{ ch.client }}</span>
+                                  <span style="{{ ch.audStyle }}">{{ ch.audience }}</span>
+                                  <span style="font-size:12px; color:var(--sz-grey-400);">{{ ch.rel }}</span>
+                                  <span style="flex:1;"></span>
+                                  <button onClick="{{ ch.move }}" style="background:none;border:none;font-family:var(--font-display);font-weight:500;font-size:11.5px;color:var(--sz-grey-500);cursor:pointer;">Move</button>
+                                  <button onClick="{{ ch.unlink }}" style="background:none;border:none;font-family:var(--font-display);font-weight:500;font-size:11.5px;color:var(--status-error);cursor:pointer;">Unlink</button>
+                                </div>
+                                <div style="font-size:13px; color:var(--sz-grey-700); line-height:1.45; padding-left:20px;">“{{ ch.quote }}”</div>
+                              </div>
+                            </sc-for>
+                          </div>
+                        </sc-if>
+
+                        <!-- threads -->
+                        <sc-if value="{{ row.hasReplies }}" hint-placeholder-val="{{ false }}">
+                          <div style="{{ row.threadBlockStyle }}">
+                            <sc-for list="{{ row.threads }}" as="t" hint-placeholder-count="2">
+                              <div>
+                                <div style="display:flex; align-items:center; gap:8px;"><span style="font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--text-strong);">{{ t.author }}</span><span style="font-size:12px; color:var(--sz-grey-400);">{{ t.rel }}</span></div>
+                                <div style="font-size:13px; color:var(--sz-grey-700); line-height:1.45; margin-top:2px;">{{ t.text }}</div>
+                                <sc-if value="{{ t.hasMedia }}" hint-placeholder-val="{{ false }}">
+                                  <div style="margin-top:7px; position:relative; width:46px; height:34px;">
+                                    <image-slot id="{{ t.mediaSlotId }}" shape="rounded" radius="6" placeholder="img" style="width:46px; height:34px;"></image-slot>
+                                    <button onClick="{{ t.openMedia }}" title="Expand thread + image" style="position:absolute; top:2px; right:2px; width:16px; height:16px; border-radius:4px; background:rgba(10,10,11,.6); color:#fff; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:9px; padding:0;">⤢</button>
+                                  </div>
+                                </sc-if>
+                              </div>
+                            </sc-for>
+                          </div>
+                        </sc-if>
+
+                        <!-- original message -->
+                        <div style="background:var(--sz-grey-050); border:1px solid var(--border-hairline); border-radius:8px; padding:12px 14px; margin-bottom:10px;">
+                          <div style="font-family:var(--font-display); font-weight:700; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sz-grey-400); margin-bottom:6px;">Original message · {{ row.channelOrMeeting }}</div>
+                          <div style="font-size:13px; color:var(--sz-grey-700); line-height:1.55; white-space:pre-wrap;">{{ row.original }}</div>
+                        </div>
+
+                        <!-- Jira linked issues -->
+                        <div style="border:1px solid var(--border-hairline); border-radius:8px; padding:12px 14px; margin-bottom:10px;">
+                          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                            <span style="font-family:var(--font-display); font-weight:700; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sz-grey-400);">Jira · linked issues</span>
+                            <span style="flex:1;"></span>
+                            <button onClick="{{ row.openJira }}" style="display:inline-flex; align-items:center; gap:6px; background:var(--sz-blue-050); color:var(--sz-blue-700); border:none; border-radius:999px; padding:5px 11px; font-family:var(--font-display); font-weight:700; font-size:12px; cursor:pointer;">+ Link issue</button>
+                          </div>
+                          <sc-if value="{{ row.hasJira }}" hint-placeholder-val="{{ false }}">
+                            <div style="display:flex; flex-direction:column; gap:8px;">
+                              <sc-for list="{{ row.jira }}" as="j" hint-placeholder-count="1">
+                                <div style="display:flex; align-items:center; gap:10px; padding:9px 11px; border:1px solid var(--border-hairline); border-radius:8px;">
+                                  <span style="{{ j.iconStyle }}">{{ j.icon }}</span>
+                                  <a href="{{ j.url }}" target="_blank" style="font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--sz-blue-700); text-decoration:none; flex:none;">{{ j.key }}</a>
+                                  <span style="flex:1; min-width:0; font-size:13px; color:var(--text-strong); line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ j.title }}</span>
+                                  <span style="{{ j.statusStyle }}">{{ j.status }}</span>
+                                  <span style="font-size:12px; color:var(--sz-grey-500); flex:none;">{{ j.assignee }}</span>
+                                  <button onClick="{{ j.unlink }}" title="Unlink" style="background:none; border:none; cursor:pointer; color:var(--status-error); font-family:var(--font-display); font-weight:500; font-size:11.5px; flex:none;">Unlink</button>
+                                </div>
+                              </sc-for>
+                            </div>
+                            <div style="font-size:11.5px; color:var(--sz-grey-400); margin-top:9px;">Two-way link — this feedback also appears on each issue in Jira.</div>
+                          </sc-if>
+                          <sc-if value="{{ row.noJira }}" hint-placeholder-val="{{ true }}">
+                            <div style="font-size:12.5px; color:var(--sz-grey-500);">No issues linked yet. Link one to track it in delivery — the feedback shows on the Jira issue too.</div>
+                          </sc-if>
+                        </div>
+
+                        <!-- pipeline drawer -->
+                        <button onClick="{{ row.togglePipeline }}" style="display:inline-flex; align-items:center; gap:7px; background:none; border:none; cursor:pointer; font-family:var(--font-display); font-weight:500; font-size:12.5px; color:var(--sz-grey-500); padding:0;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                          Pipeline internals {{ row.pipelineChev }}
+                        </button>
+                        <sc-if value="{{ row.pipelineOpen }}" hint-placeholder-val="{{ false }}">
+                          <div style="margin-top:8px; border:1px solid var(--border-hairline); border-radius:8px; padding:14px 16px;">
+                            <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                              <span style="font-family:var(--font-display); font-weight:700; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sz-grey-500);">Review the AI's work</span>
+                              <span style="font-size:12px; color:var(--sz-grey-400);">Your corrections train the enrichment pipeline.</span>
+                            </div>
+
+                            <!-- read-only context -->
+                            <div style="display:grid; grid-template-columns:150px 1fr; gap:5px 14px; font-size:12.5px; margin-bottom:6px;">
+                              <span style="color:var(--sz-grey-500);">Enrichment confidence</span><span style="color:var(--text-strong);">{{ row.confidence }}</span>
+                              <span style="color:var(--sz-grey-500);">Judge rationale</span><span style="color:var(--sz-grey-700);">{{ row.judge }}</span>
+                              <span style="color:var(--sz-grey-500);">Flagged by</span><span style="color:var(--sz-grey-700);">{{ row.flaggedBy }}</span>
+                            </div>
+
+                            <!-- Gate verdict -->
+                            <div style="border-top:1px solid var(--border-hairline); padding:12px 0 4px;">
+                              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;"><span style="font-family:var(--font-display); font-weight:500; font-size:13px; color:var(--text-strong);">Is this actually feedback?</span><span style="font-size:11.5px; color:var(--sz-grey-400);">AI: Confirmed feedback</span></div>
+                              <div style="display:flex; gap:8px;"><button onClick="{{ row.review.setGateYes }}" style="{{ row.review.gateYesStyle }}">✓ Yes, feedback</button><button onClick="{{ row.review.setGateNo }}" style="{{ row.review.gateNoStyle }}">✗ Not feedback</button></div>
+                              <sc-if value="{{ row.review.showGateReason }}" hint-placeholder-val="{{ false }}"><textarea value="{{ row.review.gateReason }}" onInput="{{ row.review.onGateReason }}" placeholder="Why isn't this feedback? (this note is sent to the AI)" style="margin-top:9px; width:100%; border:1px solid var(--border-hairline); border-radius:8px; padding:9px 11px; font-family:var(--font-body); font-size:13px; color:var(--text-strong); min-height:58px; resize:vertical;"></textarea></sc-if>
+                            </div>
+
+                            <!-- Summary verdict -->
+                            <div style="border-top:1px solid var(--border-hairline); padding:12px 0 4px;">
+                              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;"><span style="font-family:var(--font-display); font-weight:500; font-size:13px; color:var(--text-strong);">Is the summary faithful?</span><span style="font-size:11.5px; color:var(--sz-grey-400);">AI: {{ row.summaryVerdictLabel }}</span></div>
+                              <div style="display:flex; gap:8px;"><button onClick="{{ row.review.setSumYes }}" style="{{ row.review.sumYesStyle }}">✓ Faithful</button><button onClick="{{ row.review.setSumNo }}" style="{{ row.review.sumNoStyle }}">✗ Needs changes</button></div>
+                              <sc-if value="{{ row.review.showSummaryTable }}" hint-placeholder-val="{{ false }}">
+                                <div style="margin-top:10px; border:1px solid var(--border-hairline); border-radius:8px; overflow:hidden;">
+                                  <div style="background:var(--sz-grey-050); padding:7px 12px; font-family:var(--font-display); font-weight:700; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--sz-grey-500);">Mark each claim · correct or changeable</div>
+                                  <sc-for list="{{ row.review.summaryRows }}" as="sr" hint-placeholder-count="2">
+                                    <div style="padding:10px 12px; border-top:1px solid var(--border-hairline);">
+                                      <div style="font-size:13px; color:var(--sz-grey-700); line-height:1.45; margin-bottom:7px;">{{ sr.text }}</div>
+                                      <div style="display:flex; gap:8px;"><button onClick="{{ sr.setCorrect }}" style="{{ sr.correctStyle }}">Correct</button><button onClick="{{ sr.setChange }}" style="{{ sr.changeStyle }}">Change</button></div>
+                                      <sc-if value="{{ sr.showRationale }}" hint-placeholder-val="{{ false }}"><input value="{{ sr.rationale }}" onInput="{{ sr.onRationale }}" placeholder="What should this claim say instead?" style="margin-top:8px; width:100%; border:1px solid var(--border-hairline); border-radius:8px; padding:8px 11px; font-family:var(--font-body); font-size:13px; color:var(--text-strong);" /></sc-if>
+                                    </div>
+                                  </sc-for>
+                                </div>
+                              </sc-if>
+                            </div>
+
+                            <!-- Related link -->
+                            <div style="border-top:1px solid var(--border-hairline); padding:12px 0 4px;">
+                              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;"><span style="font-family:var(--font-display); font-weight:500; font-size:13px; color:var(--text-strong);">Is the related-feedback link correct?</span><span style="font-size:11.5px; color:var(--sz-grey-400);">{{ row.review.relatedLabelText }}</span></div>
+                              <sc-if value="{{ row.review.hasLink }}" hint-placeholder-val="{{ false }}"><div style="display:flex; gap:8px;"><button onClick="{{ row.review.setRelYes }}" style="{{ row.review.relYesStyle }}">✓ Correct</button><button onClick="{{ row.review.setRelNo }}" style="{{ row.review.relNoStyle }}">✗ Incorrect</button></div></sc-if>
+                              <sc-if value="{{ row.review.noLink }}" hint-placeholder-val="{{ true }}"><span style="font-size:12.5px; color:var(--sz-grey-400);">No related link on this item.</span></sc-if>
+                            </div>
+
+                            <sc-if value="{{ row.review.sent }}" hint-placeholder-val="{{ false }}"><div style="border-top:1px solid var(--border-hairline); margin-top:8px; padding-top:10px; display:flex; align-items:center; gap:7px; color:#1f7a52; font-family:var(--font-display); font-weight:700; font-size:12.5px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>Sent to the enrichment learning loop</div></sc-if>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+
+        <sc-if value="{{ listEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center; padding:70px 20px; color:var(--sz-grey-500);">
+            <p style="font-size:15px; margin:0 0 4px; color:var(--text-strong); font-family:var(--font-display); font-weight:700;">No feedback matches these filters</p>
+            <p style="font-size:13.5px; margin:0;">Try clearing a filter or widening the date range.</p>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- toast -->
+    <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+      <div style="position:fixed; bottom:26px; left:50%; transform:translateX(-50%); background:var(--sz-ink); color:#fff; padding:11px 18px; border-radius:999px; font-family:var(--font-display); font-weight:500; font-size:13.5px; box-shadow:0 8px 30px rgba(0,0,0,.25); z-index:60; animation:fbToast .2s var(--ease-out,ease);">{{ toast }}</div>
+    </sc-if>
+
+  </main>
+
+  <!-- ===== MEDIA LIGHTBOX ===== -->
+  <sc-if value="{{ mediaOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ md.close }}" style="position:fixed; inset:0; background:rgba(10,10,11,.55); z-index:80; display:flex; align-items:center; justify-content:center; padding:32px;">
+      <div onClick="{{ md.stop }}" style="width:min(920px,94vw); height:min(70vh,560px); background:#fff; border-radius:16px; box-shadow:0 30px 80px rgba(0,0,0,.35); overflow:hidden; display:flex; position:relative; animation:fbFade .18s var(--ease-out,ease);">
+        <button onClick="{{ md.close }}" title="Close (Esc)" style="position:absolute; top:12px; right:12px; z-index:3; width:32px; height:32px; border-radius:50%; background:rgba(255,255,255,.92); border:1px solid var(--border-hairline); cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--sz-grey-700); font-size:15px; box-shadow:0 2px 10px rgba(0,0,0,.15);">✕</button>
+        <div class="fb-scroll" style="width:50%; height:100%; overflow-y:auto; padding:26px 24px; border-right:1px solid var(--border-hairline);">
+          <sc-if value="{{ md.isThread }}" hint-placeholder-val="{{ false }}"><div style="font-family:var(--font-display); font-weight:700; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sz-grey-400); margin-bottom:8px;">Thread on</div></sc-if>
+          <h3 style="font-family:var(--font-display); font-weight:700; font-size:19px; letter-spacing:-.01em; color:var(--text-strong); margin:0 0 12px; line-height:1.25;">{{ md.title }}</h3>
+          <ul style="margin:0 0 16px; padding-left:16px; display:flex; flex-direction:column; gap:4px;"><sc-for list="{{ md.bullets }}" as="b" hint-placeholder-count="2"><li style="font-size:13.5px; color:var(--sz-grey-700); line-height:1.5;">{{ b }}</li></sc-for></ul>
+          <sc-if value="{{ md.isThread }}" hint-placeholder-val="{{ false }}"><div style="background:var(--sz-grey-050); border:1px solid var(--border-hairline); border-radius:10px; padding:12px 14px; margin-bottom:14px;"><div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;"><span style="font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--text-strong);">{{ md.threadAuthor }}</span><span style="font-size:12px; color:var(--sz-grey-400);">{{ md.threadRel }}</span></div><div style="font-size:13.5px; color:var(--sz-grey-700); line-height:1.5;">{{ md.threadText }}</div></div></sc-if>
+          <div style="font-family:var(--font-display); font-weight:700; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--sz-grey-400); margin-bottom:6px;">Original · {{ md.channelOrMeeting }}</div>
+          <div style="font-size:13px; color:var(--sz-grey-700); line-height:1.55; white-space:pre-wrap;">{{ md.original }}</div>
+        </div>
+        <div style="width:50%; height:100%; background:var(--sz-grey-050); display:flex; flex-direction:column;">
+          <div style="flex:1; min-height:0; position:relative;">
+            <sc-if value="{{ md.isImage }}" hint-placeholder-val="{{ true }}"><image-slot id="{{ md.slotId }}" shape="rect" placeholder="Drop screenshot or video frame" style="width:100%; height:100%;"></image-slot></sc-if>
+            <sc-if value="{{ md.isVideo }}" hint-placeholder-val="{{ false }}"><div style="width:100%; height:100%; background:#0a0a0b; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:#fff;"><span style="width:60px; height:60px; border-radius:50%; background:rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center; font-size:22px;">▶</span><span style="font-size:12.5px; opacity:.8;">Video preview</span></div></sc-if>
+          </div>
+          <div style="padding:10px 14px; font-size:12px; color:var(--sz-grey-500); border-top:1px solid var(--border-hairline); background:#fff;">{{ md.mediaLabel }}</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== JIRA LINK MODAL ===== -->
+  <sc-if value="{{ jiraOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ jira.close }}" style="position:fixed; inset:0; background:rgba(10,10,11,.4); z-index:70; display:flex; align-items:flex-start; justify-content:center; padding-top:11vh;">
+      <div onClick="{{ jira.stop }}" style="width:620px; max-width:92vw; background:#fff; border-radius:14px; box-shadow:0 24px 70px rgba(0,0,0,.3); overflow:hidden; animation:fbFade .18s var(--ease-out,ease);">
+        <div style="padding:16px 18px; border-bottom:1px solid var(--border-hairline);">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="width:22px; height:22px; border-radius:5px; background:var(--sz-blue); color:#fff; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px;">J</span>
+            <div style="font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-strong);">Link a Jira issue</div>
+            <span style="flex:1;"></span>
+            <span style="display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:#1f7a52; font-family:var(--font-display); font-weight:700;"><span style="width:7px; height:7px; border-radius:50%; background:#1f8a5b;"></span>Indigo board · connected</span>
+          </div>
+          <div style="font-size:12.5px; color:var(--sz-grey-500); margin-top:4px;">Links both ways — the feedback appears on the Jira issue, and the issue shows here.</div>
+          <input value="{{ jira.query }}" onInput="{{ jira.onInput }}" placeholder="Search issues by key or title…" autofocus="true" style="margin-top:12px; width:100%; border:1px solid var(--border-hairline); border-radius:8px; padding:10px 12px; font-family:var(--font-body); font-size:14px; color:var(--text-strong);" />
+        </div>
+        <div class="fb-scroll" style="max-height:340px; overflow-y:auto; padding:6px;">
+          <sc-for list="{{ jira.results }}" as="j" hint-placeholder-count="4">
+            <button onClick="{{ j.pick }}" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:none; border:none; cursor:pointer; padding:10px 12px; border-radius:8px;">
+              <span style="{{ j.iconStyle }}">{{ j.icon }}</span>
+              <span style="font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--sz-blue-700); flex:none;">{{ j.key }}</span>
+              <span style="flex:1; min-width:0; font-size:13px; color:var(--text-strong); line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ j.title }}</span>
+              <span style="{{ j.statusStyle }}">{{ j.status }}</span>
+              <sc-if value="{{ j.linked }}" hint-placeholder-val="{{ false }}"><span style="font-size:11.5px; color:#1f7a52; font-family:var(--font-display); font-weight:700; flex:none;">✓ Linked</span></sc-if>
+            </button>
+          </sc-for>
+          <sc-if value="{{ jira.empty }}" hint-placeholder-val="{{ false }}"><div style="padding:22px; text-align:center; font-size:13px; color:var(--sz-grey-500);">No matching issues on the Indigo board.</div></sc-if>
+        </div>
+        <div style="padding:11px 16px; border-top:1px solid var(--border-hairline); display:flex; align-items:center; gap:10px;">
+          <button onClick="{{ jira.createIssue }}" style="display:inline-flex; align-items:center; gap:7px; background:#fff; border:1px solid var(--border-strong); border-radius:999px; padding:8px 14px; font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--sz-ink); cursor:pointer;">+ Create new issue from feedback</button>
+          <span style="flex:1;"></span>
+          <button onClick="{{ jira.close }}" style="background:none; border:none; font-family:var(--font-display); font-weight:500; font-size:13px; color:var(--sz-grey-500); cursor:pointer;">Done</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== LINK MODAL ===== -->
+  <sc-if value="{{ linkOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeLink }}" style="position:fixed; inset:0; background:rgba(10,10,11,.4); z-index:70; display:flex; align-items:flex-start; justify-content:center; padding-top:12vh;">
+      <div onClick="{{ stop }}" style="width:560px; max-width:92vw; background:#fff; border-radius:14px; box-shadow:0 24px 70px rgba(0,0,0,.3); overflow:hidden; animation:fbFade .18s var(--ease-out,ease);">
+        <div style="padding:16px 18px; border-bottom:1px solid var(--border-hairline);">
+          <div style="font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-strong);">Link to related feedback</div>
+          <div style="font-size:12.5px; color:var(--sz-grey-500); margin-top:2px;">Search for the item this should be linked to as a duplicate / same request.</div>
+          <input value="{{ linkQuery }}" onInput="{{ onLinkInput }}" placeholder="Search feedback…" autofocus="true" style="margin-top:12px; width:100%; border:1px solid var(--border-hairline); border-radius:8px; padding:10px 12px; font-family:var(--font-body); font-size:14px; color:var(--text-strong);" />
+        </div>
+        <div class="fb-scroll" style="max-height:320px; overflow-y:auto; padding:6px;">
+          <sc-for list="{{ linkResults }}" as="r" hint-placeholder-count="4">
+            <button onClick="{{ r.pick }}" style="display:block; width:100%; text-align:left; background:none; border:none; cursor:pointer; padding:11px 12px; border-radius:8px;" onMouseover="{{ r.hoverOn }}">
+              <span style="display:block; font-family:var(--font-display); font-weight:700; font-size:13.5px; color:var(--text-strong); line-height:1.3;">{{ r.title }}</span>
+              <span style="display:block; font-size:12px; color:var(--sz-grey-500); margin-top:2px;">{{ r.meta }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== SHORTCUTS MODAL ===== -->
+  <sc-if value="{{ shortcutsOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeShortcuts }}" style="position:fixed; inset:0; background:rgba(10,10,11,.4); z-index:70; display:flex; align-items:center; justify-content:center;">
+      <div onClick="{{ stop }}" style="width:420px; max-width:92vw; background:#fff; border-radius:14px; box-shadow:0 24px 70px rgba(0,0,0,.3); overflow:hidden; animation:fbFade .18s var(--ease-out,ease);">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border-hairline); font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-strong);">Triage keyboard shortcuts</div>
+        <div style="padding:10px 20px 18px;">
+          <sc-for list="{{ shortcuts }}" as="s" hint-placeholder-count="5">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--sz-grey-100);">
+              <span style="font-size:13.5px; color:var(--sz-grey-700);">{{ s.action }}</span>
+              <kbd style="background:var(--sz-grey-100); border:1px solid var(--border-hairline); border-radius:6px; padding:3px 9px; font-family:var(--font-display); font-weight:700; font-size:12px; color:var(--text-strong);">{{ s.key }}</kbd>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;density&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Comfortable&quot;, &quot;Compact&quot;], &quot;default&quot;: &quot;Comfortable&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Layout&quot; },
+  &quot;defaultSort&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Newest&quot;, &quot;Most raised&quot;, &quot;Needs Review first&quot;], &quot;default&quot;: &quot;Newest&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Layout&quot; },
+  &quot;raisedExpandedByDefault&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Behaviour&quot; },
+  &quot;confidenceOnCard&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Behaviour&quot; }
+}">
+class Component extends DCLogic {
+  state = {
+    view: "all",
+    sort: "newest",
+    filters: { status: [], source: [], category: [], audience: [], confidence: [], client: "", search: "" },
+    openFacets: { status: true, source: true, category: false, audience: false, confidence: false },
+    expanded: {}, pipelineOpen: {}, demandOpen: {}, removed: {}, reviews: {}, media: null, batchOpen: {},
+    jiraOpen: false, jiraSourceId: null, jiraQuery: "", jiraLinks: {}, jiraRemoved: {},
+    triageIndex: 0,
+    shortcutsOpen: false, linkOpen: false, linkSourceId: null, linkQuery: "",
+    toast: null, loaded: false
+  };
+
+  componentDidMount() {
+    this.rows = (window.SZ_FEEDBACK || []).slice();
+    this.CAT = window.SZ_CATEGORY_META || {};
+    this.AUD = window.SZ_AUDIENCE_META || {};
+    const sd = { "Newest": "newest", "Most raised": "most-raised", "Needs Review first": "needs-review" }[this.props.defaultSort];
+    this.setState({ loaded: true, sort: sd || this.state.sort });
+    this._onKey = (e) => this.handleKey(e);
+    document.addEventListener("keydown", this._onKey);
+  }
+  componentWillUnmount() { document.removeEventListener("keydown", this._onKey); }
+
+  // ---------- helpers ----------
+  statusColor(s) {
+    return { "New": "#006aff", "Needs Review": "#e07a2f", "Reviewed": "#e6b800", "Actioned": "#1f8a5b" }[s] || "#9aa0ab";
+  }
+  pillStyle(cat) {
+    const m = this.CAT[cat] || { bg: "#f1f3f6", fg: "#4a4d57", dot: "#9aa0ab" };
+    return { display: "inline-flex", alignItems: "center", gap: "5px", background: m.bg, color: m.fg,
+      fontFamily: "var(--font-display)", fontWeight: 500, fontSize: "12px", lineHeight: 1,
+      padding: "4px 9px", borderRadius: "999px", whiteSpace: "nowrap" };
+  }
+  pill(cat) { const m = this.CAT[cat] || {}; return { label: cat, style: this.pillStyle(cat), dot: m.dot }; }
+  audStyle(a) {
+    const c = this.AUD[a] || "#767a85";
+    return { display: "inline-flex", alignItems: "center", background: "#fff", color: c, border: "1px solid " + c + "33",
+      fontFamily: "var(--font-display)", fontWeight: 500, fontSize: "11px", padding: "2px 8px", borderRadius: "999px" };
+  }
+  sourceStyle(isSlack) {
+    return isSlack
+      ? { display: "inline-flex", alignItems: "center", gap: "5px", background: "var(--sz-blue-050)", color: "var(--sz-blue-700)", fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "11px", padding: "4px 9px", borderRadius: "6px", whiteSpace: "nowrap" }
+      : { display: "inline-flex", alignItems: "center", gap: "5px", background: "var(--sz-grey-100)", color: "var(--sz-grey-700)", fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "11px", padding: "4px 9px", borderRadius: "6px", whiteSpace: "nowrap" };
+  }
+  confChip(conf) {
+    if (conf === "Medium") return { label: "Medium confidence", style: this._confStyle("#7a5e00", "#fff7d6") };
+    if (conf === "Low") return { label: "Low confidence", style: this._confStyle("#b23636", "#fdECEC") };
+    return { label: "", style: { display: "none" } };
+  }
+  _confStyle(fg, bg) {
+    return { display: "inline-flex", alignItems: "center", gap: "5px", background: bg, color: fg,
+      fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "11px", padding: "3px 8px", borderRadius: "999px", whiteSpace: "nowrap" };
+  }
+  highlight(text) {
+    const q = (this.state.filters.search || "").trim();
+    if (!q) return text;
+    const i = text.toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) return text;
+    return React.createElement(React.Fragment, null,
+      text.slice(0, i),
+      React.createElement("mark", null, text.slice(i, i + q.length)),
+      text.slice(i + q.length));
+  }
+  rowCategories(r) {
+    if (r.kind === "batch") { const s = new Set(); (r.siblings || []).forEach(x => (x.categories || []).forEach(c => s.add(c))); return [...s]; }
+    return r.categories || [];
+  }
+  matchesFilters(r) {
+    const f = this.state.filters;
+    if (f.status.length && !f.status.includes(r.status)) return false;
+    if (f.source.length && !f.source.includes(r.source)) return false;
+    if (f.audience.length) { const auds = r.kind === "batch" ? (r.siblings || []).map(s => s.audience) : [r.audience]; if (!auds.some(a => f.audience.includes(a))) return false; }
+    if (f.confidence.length && !f.confidence.includes(r.confidence)) return false;
+    if (f.category.length) { const cats = this.rowCategories(r); if (!cats.some(c => f.category.includes(c))) return false; }
+    if (f.client.trim()) { if (!(r.client || "").toLowerCase().includes(f.client.trim().toLowerCase())) return false; }
+    if (f.search.trim()) {
+      const q = f.search.trim().toLowerCase();
+      const hay = [r.title, (r.summary || []).join(" "), r.original, (r.siblings || []).map(s => s.title + " " + (s.summary || []).join(" ")).join(" ")].join(" ").toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  }
+  demandOf(r) { return r.demand || (r.children ? r.children.length + 1 : 0); }
+
+  baseRows() {
+    const rem = this.state.removed;
+    let rows = this.rows || [];
+    if (this.state.view === "snoozed") return rows.filter(r => rem[r.id] === "snoozed");
+    rows = rows.filter(r => !rem[r.id]);
+    if (this.state.view === "needs-review") rows = rows.filter(r => r.status === "Needs Review");
+    return rows;
+  }
+  visibleRows() {
+    let rows = this.baseRows().filter(r => this.matchesFilters(r));
+    const s = this.state.sort;
+    const dnum = (r) => new Date(r.date).getTime();
+    if (s === "newest") rows.sort((a, b) => dnum(b) - dnum(a));
+    else if (s === "oldest") rows.sort((a, b) => dnum(a) - dnum(b));
+    else if (s === "most-raised") rows.sort((a, b) => this.demandOf(b) - this.demandOf(a) || dnum(b) - dnum(a));
+    else if (s === "needs-review") rows.sort((a, b) => (a.status === "Needs Review" ? 0 : 1) - (b.status === "Needs Review" ? 0 : 1) || dnum(b) - dnum(a));
+    return rows;
+  }
+
+  // ---------- actions ----------
+  setFilters(patch) { this.setState(st => ({ filters: { ...st.filters, ...patch } })); }
+  toggleArr(key, val) {
+    this.setState(st => {
+      const arr = st.filters[key].includes(val) ? st.filters[key].filter(x => x !== val) : [...st.filters[key], val];
+      return { filters: { ...st.filters, [key]: arr } };
+    });
+  }
+  toggleFacet(k) { this.setState(st => ({ openFacets: { ...st.openFacets, [k]: !st.openFacets[k] } })); }
+  toggleExpand(id) { this.setState(st => ({ expanded: { ...st.expanded, [id]: !st.expanded[id] } })); }
+  togglePipeline(id) { this.setState(st => ({ pipelineOpen: { ...st.pipelineOpen, [id]: !st.pipelineOpen[id] } })); }
+  setReview(id, patch, toast) { this.setState(st => ({ reviews: { ...st.reviews, [id]: { ...(st.reviews[id] || {}), ...patch } } })); if (toast) this.showToast("Sent to the enrichment learning loop"); }
+  setSummaryRow(id, i, patch, toast) { this.setState(st => { const r = st.reviews[id] || {}; const rows = { ...(r.summaryRows || {}) }; rows[i] = { ...(rows[i] || {}), ...patch }; return { reviews: { ...st.reviews, [id]: { ...r, summaryRows: rows } } }; }); if (toast) this.showToast("Sent to the enrichment learning loop"); }
+  reviewBtnStyle(active, tone) { const base = { display: "inline-flex", alignItems: "center", gap: "5px", borderRadius: "999px", padding: "5px 12px", fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "12px", cursor: "pointer", border: "1px solid var(--border-strong)", background: "#fff", color: "var(--sz-grey-700)" }; if (!active) return base; if (tone === "good") return { ...base, background: "#e7f4ee", color: "#1f7a52", border: "1px solid #bfe3d0" }; return { ...base, background: "#fdECEC", color: "#b23636", border: "1px solid #f3c9c9" }; }
+  verifLabel(v) { return v === "ai-confirmed" ? "AI · confirmed" : v === "manual" ? "Manual" : "AI · unverified"; }
+  verifStyle(v) { const base = { display: "inline-flex", alignItems: "center", fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "10.5px", padding: "2px 7px", borderRadius: "999px" }; if (v === "ai-confirmed") return { ...base, background: "#e7f4ee", color: "#1f7a52" }; if (v === "manual") return { ...base, background: "var(--sz-blue-050)", color: "var(--sz-blue-700)" }; return { ...base, background: "#fff7d6", color: "#7a5e00" }; }
+  jiraIcon(type) { return { Bug: "◆", Story: "▮", Epic: "⬥", Task: "✓" }[type] || "▮"; }
+  jiraIconStyle(type) { const c = { Bug: "#d23b3b", Story: "#1f8a5b", Epic: "#7c5cd6", Task: "#006aff" }[type] || "#9aa0ab"; return { width: "17px", height: "17px", borderRadius: "4px", background: c, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px", flex: "none" }; }
+  jiraStatusStyle(status) { const map = { "Backlog": ["#4a4d57", "#f1f3f6"], "To Do": ["#4a4d57", "#eceef2"], "In Progress": ["#0052cc", "#e6f0ff"], "In Review": ["#7a5e00", "#fff7d6"], "Done": ["#1f7a52", "#e7f4ee"] }; const c = map[status] || ["#4a4d57", "#f1f3f6"]; return { display: "inline-flex", alignItems: "center", background: c[1], color: c[0], fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "10.5px", letterSpacing: ".03em", textTransform: "uppercase", padding: "2px 7px", borderRadius: "999px", flex: "none", whiteSpace: "nowrap" }; }
+  linkedJira(r) {
+    const pool = window.SZ_JIRA_POOL || [];
+    const base = (r.jira || []).map(j => j.key);
+    const added = this.state.jiraLinks[r.id] || [];
+    const removed = this.state.jiraRemoved[r.id] || [];
+    const keys = [...new Set([...base, ...added])].filter(k => !removed.includes(k));
+    return keys.map(k => (r.jira || []).find(j => j.key === k) || pool.find(j => j.key === k)).filter(Boolean);
+  }
+  openJira(rowId) { this.setState({ jiraOpen: true, jiraSourceId: rowId, jiraQuery: "" }); }
+  toggleJira(rowId, key) {
+    this.setState(st => {
+      const r = (this.rows || []).find(x => x.id === rowId) || {};
+      const base = (r.jira || []).map(j => j.key);
+      const added = new Set(st.jiraLinks[rowId] || []);
+      const removed = new Set(st.jiraRemoved[rowId] || []);
+      const currently = ([...new Set([...base, ...added])]).filter(k => !removed.has(k)).includes(key);
+      if (currently) { if (base.includes(key)) removed.add(key); added.delete(key); }
+      else { removed.delete(key); if (!base.includes(key)) added.add(key); }
+      return { jiraLinks: { ...st.jiraLinks, [rowId]: [...added] }, jiraRemoved: { ...st.jiraRemoved, [rowId]: [...removed] } };
+    });
+    this.showToast("Jira link updated · synced both ways");
+  }
+  openMedia(rowId, threadIndex, sibIndex) { this.setState({ media: { rowId, threadIndex: (threadIndex == null ? null : threadIndex), sibIndex: (sibIndex == null ? null : sibIndex) } }); }
+  toggleBatch(rowId, i) { const key = rowId + "-" + i; this.setState(st => ({ batchOpen: { ...st.batchOpen, [key]: !st.batchOpen[key] } })); }
+  toggleRaised(id, def) { this.setState(st => { const cur = (id in st.demandOpen) ? st.demandOpen[id] : def; return { demandOpen: { ...st.demandOpen, [id]: !cur } }; }); }
+  showToast(msg) { this.setState({ toast: msg }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: null }), 2200); }
+  triageResolve(id, kind, label) {
+    this.setState(st => ({ removed: { ...st.removed, [id]: kind }, triageIndex: Math.max(0, st.triageIndex) }));
+    this.showToast(label);
+  }
+  handleKey(e) {
+    if (e.key === "Escape" && this.state.media) { this.setState({ media: null }); return; }
+    if (this.state.view !== "needs-review") { if (e.key === "?") this.setState({ shortcutsOpen: true }); if (e.key === "Escape") this.setState({ shortcutsOpen: false, linkOpen: false }); return; }
+    const tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
+    if (e.key === "Escape") { this.setState({ shortcutsOpen: false, linkOpen: false }); return; }
+    if (e.key === "?") { this.setState({ shortcutsOpen: true }); return; }
+    const list = this.visibleRows();
+    if (!list.length) return;
+    let idx = Math.min(this.state.triageIndex, list.length - 1);
+    const cur = list[idx];
+    const k = e.key.toLowerCase();
+    if (k === "j" || e.key === "ArrowDown") { e.preventDefault(); this.setState({ triageIndex: Math.min(list.length - 1, idx + 1) }); }
+    else if (k === "k" || e.key === "ArrowUp") { e.preventDefault(); this.setState({ triageIndex: Math.max(0, idx - 1) }); }
+    else if (k === "a") { this.triageResolve(cur.id, "approved", "Approved · moved to board"); }
+    else if (k === "d") { this.triageResolve(cur.id, "dismissed", "Dismissed"); }
+    else if (k === "s") { this.triageResolve(cur.id, "snoozed", "Snoozed for 7 days"); }
+    else if (k === "e") { this.showToast("Edit summary — opens inline editor"); }
+  }
+
+  // ---------- view-model ----------
+  buildVM(r, idx) {
+    const isBatch = r.kind === "batch";
+    const isStd = !isBatch;
+    const rowTint = (idx % 2 === 1) ? "var(--sz-grey-100)" : "#fff";
+    const expanded = !!this.state.expanded[r.id];
+    const pipelineOpen = !!this.state.pipelineOpen[r.id];
+    const isSlack = r.source === "Slack";
+    const metaBits = [r.client || "No account", r.audience, isSlack ? r.channel : r.meetingTitle, r.rel].filter(Boolean);
+    const vm = {
+      id: r.id, isBatch, isStandard: isStd,
+      status: r.status, statusColor: this.statusColor(r.status), needsReview: r.status === "Needs Review",
+      title: r.title || "", titleNode: this.highlight(r.title || ""),
+      bullets: r.summary || [], bulletNodes: (r.summary || []).map(b => this.highlight(b)),
+      pills: this.rowCategories(r).map(c => this.pill(c)),
+      metaLine: metaBits.join("  ·  "),
+      crewLabel: (r.crew || "Indigo") + " · " + (r.capability || "—"),
+      source: r.source, sourceLabel: r.source, sourceStyle: this.sourceStyle(isSlack),
+      messageUrl: r.messageUrl || "#",
+      channelOrMeeting: isSlack ? r.channel : r.meetingTitle,
+      original: r.original || "", judge: r.judge || "—", confidence: r.confidence || "—",
+      flaggedBy: r.flaggedBy || "—", hasImage: !!r.image,
+      summaryVerdictLabel: r.summaryVerdict || "Not reviewed",
+      relatedLabel: r.linkVerification ? (r.linkVerification === "ai-confirmed" ? "AI-suggested · Confirmed correct" : r.linkVerification === "manual" ? "Manual link" : "AI-suggested · Unverified") : "None",
+      confChipLabel: this.confChip(r.confidence).label, confChipStyle: this.confChip(r.confidence).style,
+      showConf: (this.props.confidenceOnCard !== false) && !!this.confChip(r.confidence).label,
+      bodyPad: { padding: (this.props.density === "Compact") ? "9px 24px 8px" : "15px 24px 13px", cursor: "pointer" },
+      onRowClick: (e) => { if (e.target.closest && e.target.closest("button, a, input, textarea, select, image-slot")) return; this.toggleExpand(r.id); },
+      expanded, chevStyle: { display: "inline-block", transition: "transform .18s", transform: expanded ? "rotate(180deg)" : "none", fontSize: "12px" },
+      pipelineOpen, pipelineChev: pipelineOpen ? "▾" : "▸",
+      wrapStyle: { position: "relative", borderBottom: "1px solid var(--border-hairline)", background: rowTint, transition: "background .12s" },
+      threadBlockStyle: { background: rowTint, border: "1px solid var(--border-hairline)", borderRadius: "8px", padding: "10px 13px", margin: "0 0 12px", display: "flex", flexDirection: "column", gap: "9px" },
+      toggle: () => this.toggleExpand(r.id),
+      togglePipeline: () => this.togglePipeline(r.id),
+      openLink: () => this.setState({ linkOpen: true, linkSourceId: r.id, linkQuery: "" }),
+      openJira: () => this.openJira(r.id)
+    };
+    const jiraIssues = this.linkedJira(r);
+    vm.hasJira = jiraIssues.length > 0; vm.noJira = jiraIssues.length === 0;
+    vm.jira = jiraIssues.map(j => ({ key: j.key, title: j.title, status: j.status, assignee: j.assignee, icon: this.jiraIcon(j.type), iconStyle: this.jiraIconStyle(j.type), statusStyle: this.jiraStatusStyle(j.status), url: "#", hover: j.key + " · " + j.title + " (" + j.status + ")", unlink: () => this.toggleJira(r.id, j.key) }));
+    // demand / master — always show "Raised N×"; click reveals who raised it
+    const hasChildren = !!(r.children && r.children.length);
+    const demand = (r.children ? r.children.length : 0) + 1;
+    const strong = demand >= 2;
+    vm.hasDemand = hasChildren;
+    vm.demandLabel = "Raised " + demand + "×";
+    vm.demandBtnStyle = { display: "inline-flex", alignItems: "center", gap: "6px", background: strong ? "var(--sz-blue-050)" : "transparent", border: strong ? "1px solid #cfe0ff" : "1px solid transparent", borderRadius: "999px", padding: "4px 10px", fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "12px", color: strong ? "var(--sz-blue-700)" : "var(--sz-grey-500)", cursor: "pointer" };
+    const raisedDef = this.props.raisedExpandedByDefault === true;
+    const raisedOpen = (r.id in this.state.demandOpen) ? this.state.demandOpen[r.id] : raisedDef;
+    vm.raisedOpen = raisedOpen;
+    vm.raisedCaretStyle = { display: "inline-block", transition: "transform .18s", transform: raisedOpen ? "rotate(180deg)" : "none", fontSize: "10px", color: "var(--sz-grey-400)" };
+    vm.toggleRaised = () => this.toggleRaised(r.id, raisedDef);
+    vm.raisedHeading = hasChildren ? ("Raised " + demand + "× across customers") : "Raised once";
+    vm.verifLabel = r.linkVerification ? this.verifLabel(r.linkVerification) : "";
+    vm.verifStyle = r.linkVerification ? this.verifStyle(r.linkVerification) : { display: "none" };
+    vm.raisedList = [{ client: r.client || "No account", audience: r.audience, audStyle: this.audStyle(r.audience), rel: r.rel }].concat((r.children || []).map(c => ({ client: c.client, audience: c.audience, audStyle: this.audStyle(c.audience), rel: c.rel })));
+    vm.children = (r.children || []).map((c, i) => ({
+      client: c.client, audience: c.audience, audStyle: this.audStyle(c.audience), rel: c.rel, quote: c.quote,
+      move: () => this.showToast("Move link — pick a new master"), unlink: () => this.showToast("Unlinked from " + r.title)
+    }));
+    // threads
+    vm.hasReplies = !!(r.threads && r.threads.length);
+    vm.repliesLabel = (r.threads ? r.threads.length : 0) + " threads";
+    vm.isNeedsReview = r.status === "Needs Review";
+    vm.goNeedsReview = () => this.setState({ view: "needs-review", triageIndex: 0 });
+    vm.threads = (r.threads || []).map((t, i) => ({ author: t.author, rel: t.rel, text: t.text, hasMedia: !!t.media, mediaSlotId: "media-" + r.id + "-t" + i, openMedia: () => this.openMedia(r.id, i) }));
+    const m = r.media || null;
+    vm.hasMedia = !!m;
+    vm.mediaIsImage = !!(m && m.type === "image");
+    vm.mediaIsVideo = !!(m && m.type === "video");
+    vm.mediaSlotId = "media-" + r.id;
+    vm.openMedia = () => this.openMedia(r.id, null);
+    // batch siblings
+    vm.siblingCount = (r.siblings || []).length;
+    vm.siblings = (r.siblings || []).map((s, i) => {
+      const key = r.id + "-" + i; const open = !!this.state.batchOpen[key]; const sth = s.threads || [];
+      return {
+        title: s.title, statusColor: this.statusColor(s.status || r.status),
+        summary0: (s.summary || [])[0] || "",
+        pills: (s.categories || []).map(c => this.pill(c)),
+        meta: [r.client || "No account", s.audience].filter(Boolean).join("  ·  "),
+        hasThreads: sth.length > 0, repliesLabel: sth.length + " threads",
+        open, toggle: () => this.toggleBatch(r.id, i),
+        caretStyle: { display: "inline-block", transition: "transform .18s", transform: open ? "rotate(180deg)" : "none", fontSize: "10px", color: "var(--sz-grey-400)", flex: "none" },
+        threads: sth.map((t, j) => ({ author: t.author, rel: t.rel, text: t.text, hasMedia: !!t.media, mediaSlotId: "media-" + r.id + "-s" + i + "-t" + j, openMedia: () => this.openMedia(r.id, j, i) }))
+      };
+    });
+    // pipeline review (feeds the AI learning loop)
+    const rv = this.state.reviews[r.id] || {};
+    const hasLink = !!r.linkVerification;
+    vm.review = {
+      gateYesStyle: this.reviewBtnStyle(rv.gate === "correct", "good"),
+      gateNoStyle: this.reviewBtnStyle(rv.gate === "not-feedback", "bad"),
+      setGateYes: () => this.setReview(r.id, { gate: "correct" }, true),
+      setGateNo: () => this.setReview(r.id, { gate: "not-feedback" }, true),
+      showGateReason: rv.gate === "not-feedback",
+      gateReason: rv.gateReason || "",
+      onGateReason: (e) => this.setReview(r.id, { gateReason: e.target.value }),
+      sumYesStyle: this.reviewBtnStyle(rv.summary === "faithful", "good"),
+      sumNoStyle: this.reviewBtnStyle(rv.summary === "change", "bad"),
+      setSumYes: () => this.setReview(r.id, { summary: "faithful" }, true),
+      setSumNo: () => this.setReview(r.id, { summary: "change" }, true),
+      showSummaryTable: rv.summary === "change",
+      summaryRows: (r.summary || []).map((b, i) => { const sr = (rv.summaryRows || {})[i] || {}; return { text: b, rationale: sr.rationale || "", correctStyle: this.reviewBtnStyle(sr.verdict === "correct", "good"), changeStyle: this.reviewBtnStyle(sr.verdict === "change", "bad"), showRationale: sr.verdict === "change", setCorrect: () => this.setSummaryRow(r.id, i, { verdict: "correct" }, true), setChange: () => this.setSummaryRow(r.id, i, { verdict: "change" }, true), onRationale: (e) => this.setSummaryRow(r.id, i, { rationale: e.target.value }) }; }),
+      hasLink, noLink: !hasLink,
+      relatedLabelText: hasLink ? ("AI: " + this.verifLabel(r.linkVerification)) : "No related link",
+      relYesStyle: this.reviewBtnStyle(rv.related === "correct", "good"),
+      relNoStyle: this.reviewBtnStyle(rv.related === "incorrect", "bad"),
+      setRelYes: () => this.setReview(r.id, { related: "correct" }, true),
+      setRelNo: () => this.setReview(r.id, { related: "incorrect" }, true),
+      sent: !!(rv.gate || rv.summary || rv.related)
+    };
+    return vm;
+  }
+
+  triageVM(r) {
+    const isSlack = r.source === "Slack";
+    const idxList = this.visibleRows();
+    const active = idxList[Math.min(this.state.triageIndex, idxList.length - 1)];
+    const isActive = active && active.id === r.id;
+    return {
+      id: r.id, status: r.status, statusColor: this.statusColor(r.status),
+      title: r.title, bullets: r.summary || [], pills: this.rowCategories(r).map(c => this.pill(c)),
+      metaLine: [r.client || "No account", isSlack ? r.channel : r.meetingTitle, r.rel].filter(Boolean).join("  ·  "),
+      sourceLabel: r.source, sourceStyle: this.sourceStyle(isSlack),
+      confidence: r.confidence, flaggedBy: r.flaggedBy, judge: r.judge || "—",
+      confChipLabel: this.confChip(r.confidence).label, confChipStyle: this.confChip(r.confidence).style,
+      triageCardStyle: {
+        position: "relative", background: "#fff", border: "1px solid " + (isActive ? "var(--sz-blue)" : "var(--border-hairline)"),
+        boxShadow: isActive ? "0 0 0 3px var(--sz-blue-050), 0 6px 22px rgba(0,0,0,.06)" : "0 1px 0 rgba(0,0,0,.02)",
+        borderLeft: "3px solid #e07a2f", borderRadius: "12px", padding: "16px 18px", transition: "box-shadow .15s, border-color .15s"
+      },
+      approve: () => this.triageResolve(r.id, "approved", "Approved · moved to board"),
+      dismiss: () => this.triageResolve(r.id, "dismissed", "Dismissed"),
+      snooze: () => this.triageResolve(r.id, "snoozed", "Snoozed for 7 days"),
+      edit: () => this.showToast("Edit summary — opens inline editor")
+    };
+  }
+
+  renderVals() {
+    if (!this.state.loaded) return { navItems: [], crewItems: [], facets: [], list: [], isList: true, isTriage: false };
+    const f = this.state.filters, view = this.state.view;
+    const base = this.baseRows();
+    const vis = this.visibleRows();
+    const allRows = (this.rows || []).filter(r => !this.state.removed[r.id]);
+    const nrCount = allRows.filter(r => r.status === "Needs Review").length;
+    const snoozedCount = Object.values(this.state.removed).filter(x => x === "snoozed").length;
+
+    const navDef = [
+      { key: "all", label: "All feedback", count: allRows.length, icon: "#9aa0ab" },
+      { key: "needs-review", label: "Needs Review", count: nrCount, icon: "#e07a2f", warn: true },
+      { key: "snoozed", label: "Snoozed", count: snoozedCount, icon: "#9aa0ab" }
+    ];
+    const navItems = navDef.map(n => {
+      const on = view === n.key;
+      return {
+        label: n.label, count: n.count, go: () => this.setState({ view: n.key, triageIndex: 0 }),
+        style: { width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer",
+          border: "none", borderRadius: "8px", padding: "8px 8px", fontFamily: "var(--font-display)", fontWeight: on ? 700 : 500,
+          fontSize: "13.5px", color: on ? "var(--sz-blue-700)" : "var(--sz-grey-700)", background: on ? "var(--sz-blue-050)" : "transparent" },
+        iconStyle: { width: "9px", height: "9px", borderRadius: "50%", background: n.icon, display: "block" },
+        countStyle: { fontVariantNumeric: "tabular-nums", fontSize: "12px", fontWeight: 700,
+          color: n.warn && n.count ? "#fff" : "var(--sz-grey-400)", background: n.warn && n.count ? "#e07a2f" : "transparent",
+          borderRadius: "999px", padding: n.warn && n.count ? "1px 7px" : "0" }
+      };
+    });
+
+    const crewDef = [
+      { label: "Indigo", count: allRows.length, dot: "var(--sz-blue)", key: "crew-indigo", enabled: true },
+      { label: "Crew B · soon", count: "", dot: "var(--sz-grey-300)", enabled: false },
+      { label: "Crew C · soon", count: "", dot: "var(--sz-grey-300)", enabled: false }
+    ];
+    const crewItems = crewDef.map(c => {
+      const on = view === c.key;
+      return {
+        label: c.label, count: c.count, dot: c.dot,
+        go: () => c.enabled && this.setState({ view: c.key, triageIndex: 0 }),
+        style: { width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: c.enabled ? "pointer" : "default",
+          border: "none", borderRadius: "8px", padding: "8px 8px", fontFamily: "var(--font-display)", fontWeight: on ? 700 : 500,
+          fontSize: "13.5px", color: c.enabled ? (on ? "var(--sz-blue-700)" : "var(--sz-grey-700)") : "var(--sz-grey-400)", background: on ? "var(--sz-blue-050)" : "transparent" },
+        countStyle: { fontVariantNumeric: "tabular-nums", fontSize: "12px", fontWeight: 700, color: "var(--sz-grey-400)" }
+      };
+    });
+
+    // facet counts computed against base (pre-filter) rows
+    const catList = Object.keys(this.CAT);
+    const facetsDef = [
+      { key: "status", label: "Status", options: ["New", "Needs Review", "Reviewed", "Actioned"] },
+      { key: "source", label: "Source", options: ["Slack", "Granola"] },
+      { key: "category", label: "Category", options: catList },
+      { key: "audience", label: "Audience", options: ["Recruiter", "Talent Leader", "Candidate", "Worker", "Admin", "Unknown"] },
+      { key: "confidence", label: "Confidence", options: ["High", "Medium", "Low"] }
+    ];
+    const countFor = (key, val) => base.filter(r => {
+      if (key === "status") return r.status === val;
+      if (key === "source") return r.source === val;
+      if (key === "confidence") return r.confidence === val;
+      if (key === "audience") return (r.kind === "batch" ? (r.siblings || []).map(s => s.audience) : [r.audience]).includes(val);
+      if (key === "category") return this.rowCategories(r).includes(val);
+      return false;
+    }).length;
+    const facetsFinal = facetsDef.map(fc => ({
+      label: fc.label, open: !!this.state.openFacets[fc.key], toggle: () => this.toggleFacet(fc.key),
+      chevStyle: { transition: "transform .18s", transform: this.state.openFacets[fc.key] ? "rotate(90deg)" : "none", color: "var(--sz-grey-400)", fontSize: "15px" },
+      options: fc.options.map(o => {
+        const on = f[fc.key].includes(o);
+        return {
+          label: o, count: countFor(fc.key, o), toggle: () => this.toggleArr(fc.key, o),
+          rowStyle: { display: "flex", alignItems: "center", gap: "9px", padding: "5px 6px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", color: "var(--sz-grey-700)" },
+          boxStyle: { width: "16px", height: "16px", borderRadius: "4px", border: "1px solid " + (on ? "var(--sz-blue)" : "var(--border-strong)"), background: on ? "var(--sz-blue)" : "#fff", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", flex: "none" },
+          tick: on ? "✓" : ""
+        };
+      })
+    }));
+
+    const datePresets = [
+      { label: "7 days", key: "7" }, { label: "30 days", key: "30" }, { label: "90 days", key: "90" }, { label: "Quarter", key: "q" }
+    ].map(d => ({ label: d.label, set: () => this.showToast("Date preset: last " + d.label + " (demo)"),
+      style: { border: "1px solid var(--border-hairline)", background: "#fff", borderRadius: "999px", padding: "5px 11px", fontFamily: "var(--font-display)", fontWeight: 500, fontSize: "12px", color: "var(--sz-grey-700)", cursor: "pointer" } }));
+
+    // active chips
+    const chips = [];
+    ["status", "source", "category", "audience", "confidence"].forEach(k => f[k].forEach(v => chips.push({ label: k[0].toUpperCase() + k.slice(1) + ": " + v, remove: () => this.toggleArr(k, v) })));
+    if (f.client.trim()) chips.push({ label: "Company: " + f.client, remove: () => this.setFilters({ client: "" }) });
+    if (f.search.trim()) chips.push({ label: "Search: " + f.search, remove: () => this.setFilters({ search: "" }) });
+
+    const viewTitle = view === "needs-review" ? "Needs Review" : view === "snoozed" ? "Snoozed" : view === "crew-indigo" ? "Crew: Indigo" : "All feedback";
+    const isTriage = view === "needs-review";
+
+    // media lightbox
+    let md = null;
+    if (this.state.media) {
+      const mr = (this.rows || []).find(x => x.id === this.state.media.rowId);
+      if (mr) {
+        const ti = this.state.media.threadIndex, si = this.state.media.sibIndex;
+        let title = mr.title, bullets = mr.summary || [], original = mr.original || "", isThread = false, tAuthor = "", tRel = "", tText = "", mm = mr.media, slotId = "media-" + mr.id;
+        if (si != null) {
+          const sib = (mr.siblings || [])[si] || {}; const t = (sib.threads || [])[ti] || {};
+          title = sib.title; bullets = sib.summary || []; isThread = true; tAuthor = t.author; tRel = t.rel; tText = t.text; mm = t.media; slotId = "media-" + mr.id + "-s" + si + "-t" + ti;
+        } else if (ti != null && ti >= 0) {
+          const t = (mr.threads || [])[ti] || {}; isThread = true; tAuthor = t.author; tRel = t.rel; tText = t.text; mm = t.media; slotId = "media-" + mr.id + "-t" + ti;
+        }
+        md = {
+          isThread, title, bullets, original,
+          channelOrMeeting: (mr.source === "Slack" ? mr.channel : mr.meetingTitle),
+          threadAuthor: tAuthor, threadRel: tRel, threadText: tText,
+          isImage: !!(mm && mm.type === "image"), isVideo: !!(mm && mm.type === "video"),
+          slotId, mediaLabel: mm ? mm.label : "",
+          close: () => this.setState({ media: null }), stop: (e) => e.stopPropagation()
+        };
+      }
+    }
+    // jira modal
+    let jira = null;
+    if (this.state.jiraOpen) {
+      const jr = (this.rows || []).find(x => x.id === this.state.jiraSourceId);
+      const linkedKeys = jr ? this.linkedJira(jr).map(j => j.key) : [];
+      const jq = (this.state.jiraQuery || "").toLowerCase();
+      const pool = (window.SZ_JIRA_POOL || []).filter(j => !jq || (j.key + " " + j.title).toLowerCase().includes(jq));
+      jira = {
+        query: this.state.jiraQuery, onInput: (e) => this.setState({ jiraQuery: e.target.value }),
+        close: () => this.setState({ jiraOpen: false }), stop: (e) => e.stopPropagation(),
+        empty: pool.length === 0,
+        createIssue: () => { this.setState({ jiraOpen: false }); this.showToast("New Jira issue drafted from this feedback"); },
+        results: pool.map(j => ({ key: j.key, title: j.title, status: j.status, icon: this.jiraIcon(j.type), iconStyle: this.jiraIconStyle(j.type), statusStyle: this.jiraStatusStyle(j.status), linked: linkedKeys.includes(j.key), pick: () => this.toggleJira(this.state.jiraSourceId, j.key) }))
+      };
+    }
+    // link modal results
+    const lq = (this.state.linkQuery || "").toLowerCase();
+    const linkResults = (this.rows || []).filter(r => r.id !== this.state.linkSourceId && r.kind !== "batch" && (!lq || (r.title || "").toLowerCase().includes(lq)))
+      .slice(0, 6).map(r => ({ title: r.title, meta: [r.client || "No account", r.rel].filter(Boolean).join(" · "),
+        pick: () => { this.setState({ linkOpen: false }); this.showToast("Linked as related feedback"); }, hoverOn: () => {} }));
+
+    const shortcuts = [
+      { key: "A", action: "Approve — mark Reviewed, move to board" },
+      { key: "D", action: "Dismiss — mark invalid, remove" },
+      { key: "S", action: "Snooze — hide 7 days, auto-return" },
+      { key: "E", action: "Edit — open summary edit mode" },
+      { key: "J / ↓", action: "Next item" },
+      { key: "K / ↑", action: "Previous item" },
+      { key: "?", action: "This help" }
+    ];
+
+    return {
+      navItems, crewItems, facets: facetsFinal, datePresets,
+      filters: f, sort: this.state.sort,
+      onSearchInput: (e) => this.setFilters({ search: e.target.value }),
+      onClientInput: (e) => this.setFilters({ client: e.target.value }),
+      onSortChange: (e) => this.setState({ sort: e.target.value }),
+      viewTitle,
+      countLabel: (chips.length ? "Showing " + vis.length + " of " + base.length + " items" : vis.length + " items"),
+      hasActiveChips: chips.length > 0, activeChips: chips, clearAll: () => this.setState({ filters: { status: [], source: [], category: [], audience: [], confidence: [], client: "", search: "" } }),
+      isTriage, isList: !isTriage,
+      crewHeaderShown: view === "crew-indigo",
+      crewSubLabel: allRows.length + " items · " + nrCount + " needs review",
+      list: (isTriage ? [] : vis).map((r, i) => this.buildVM(r, i)),
+      listEmpty: !isTriage && vis.length === 0,
+      triageList: (isTriage ? vis : []).map(r => this.triageVM(r)),
+      triageEmpty: isTriage && vis.length === 0,
+      openShortcuts: () => this.setState({ shortcutsOpen: true }),
+      closeShortcuts: () => this.setState({ shortcutsOpen: false }),
+      shortcutsOpen: this.state.shortcutsOpen, shortcuts,
+      openCmdk: () => this.showToast("⌘K command menu (demo)"),
+      linkOpen: this.state.linkOpen, linkQuery: this.state.linkQuery, linkResults,
+      onLinkInput: (e) => this.setState({ linkQuery: e.target.value }),
+      closeLink: () => this.setState({ linkOpen: false }), stop: (e) => e.stopPropagation(),
+      mediaOpen: !!md, md: md || {},
+      jiraOpen: !!jira, jira: jira || {},
+      hasToast: !!this.state.toast, toast: this.state.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+/* Spotted Zebra — base element styles & helpers.
+   Light, optional resets so specimen cards and kits look right out of the box. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-body);
+  line-height: var(--lh-normal);
+  color: var(--text-body);
+  background: var(--surface-page);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  color: var(--text-strong);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-heading);
+  margin: 0;
+}
+
+a { color: var(--text-link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Inverse context — on a dark/blue/ink surface, flip text + headings to white.
+   Headings otherwise inherit the dark --text-strong default and disappear on
+   blue. Add this class to any inverse-coloured wrapper (a blue band, the
+   closing slide, a CTA panel) and its type renders correctly out of the box. */
+.sz-on-inverse,
+.sz-on-inverse h1, .sz-on-inverse h2, .sz-on-inverse h3, .sz-on-inverse h4 {
+  color: var(--text-on-blue);
+}
+.sz-on-inverse a { color: var(--text-on-blue); text-decoration: underline; }
+
+/* ---- Utility helpers (prefixed sz- to avoid collisions) ---- */
+.sz-eyebrow {
+  font-size: var(--fs-eyebrow);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The signature yellow accent under a key phrase — a thin underline that
+   automatically breaks around descenders (y, g, p…) via skip-ink.
+   This is the preferred emphasis treatment (replaces the old marker block). */
+.sz-underline {
+  text-decoration: underline;
+  text-decoration-color: var(--sz-yellow);
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.12em;
+  text-decoration-skip-ink: auto;
+}
+
+/* Legacy solid marker-highlight behind a phrase. Avoid on display type —
+   prefer .sz-underline. Kept for small-text or full-block emphasis only. */
+.sz-highlight {
+  background: linear-gradient(to top, var(--sz-yellow) 0%, var(--sz-yellow) 38%, transparent 38%);
+  padding: 0 0.06em;
+}
+
+.sz-container { max-width: var(--container-max); margin: 0 auto; padding-inline: var(--space-6); }

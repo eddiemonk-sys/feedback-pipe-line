@@ -1,0 +1,59 @@
+/* Spotted Zebra — Colour tokens
+   Source of truth: Brand identity v1.2 (Notion) + 2026 website concept.
+   Direction H2 2026: white-led. Blue is the hero accent (CTAs, links, one
+   bold blue band per page). Yellow is a sparing signal. NOT navy-heavy. */
+
+:root {
+  /* ---- Brand core ---- */
+  --sz-blue: #006aff;        /* primary brand colour — CTAs, links, accents */
+  --sz-blue-700: #0052cc;    /* pressed / darker blue */
+  --sz-blue-300: #4d97ff;    /* hover lift on dark, subtle states */
+  --sz-blue-050: #e6f0ff;    /* tint wash, selected chips, icon halos */
+
+  --sz-yellow: #ffd129;      /* accent / signal — highlights, dots, spots */
+  --sz-yellow-600: #e6b800;  /* yellow on white when contrast needed */
+  --sz-yellow-050: #fff7d6;  /* faint yellow wash */
+
+  --sz-navy: #003886;        /* secondary depth — use rarely, never as the only brand colour */
+
+  /* ---- Ink & neutrals (warm-neutral grey ramp) ---- */
+  --sz-black: #0a0a0b;       /* near-black ink for text & dark surfaces */
+  --sz-ink: #14151a;         /* headings */
+  --sz-grey-900: #2b2d33;
+  --sz-grey-700: #4a4d57;    /* body text on white */
+  --sz-grey-500: #767a85;    /* secondary text, captions */
+  --sz-grey-400: #9aa0ab;    /* muted / disabled text */
+  --sz-grey-300: #c7cbd2;    /* borders (strong) */
+  --sz-grey-200: #e3e6eb;    /* hairline borders, dividers */
+  --sz-grey-100: #f1f3f6;    /* card alt, chips */
+  --sz-grey-050: #f7f8fa;    /* section band background */
+  --sz-white: #ffffff;
+
+  /* ---- Semantic aliases ---- */
+  --text-strong: var(--sz-ink);
+  --text-body: var(--sz-grey-700);
+  --text-muted: var(--sz-grey-500);
+  --text-on-blue: var(--sz-white);
+  --text-link: var(--sz-blue);
+
+  --surface-page: var(--sz-white);
+  --surface-band: var(--sz-grey-050);
+  --surface-card: var(--sz-white);
+  --surface-inverse: var(--sz-blue);     /* the signature blue CTA band */
+  --surface-ink: var(--sz-black);
+
+  --border-hairline: var(--sz-grey-200);
+  --border-strong: var(--sz-grey-300);
+
+  --accent: var(--sz-blue);
+  --accent-soft: var(--sz-blue-050);
+  --signal: var(--sz-yellow);
+
+  --focus-ring: var(--sz-blue);
+
+  /* ---- Status (kept on-brand; blue/yellow lean) ---- */
+  --status-success: #1f8a5b;
+  --status-warning: var(--sz-yellow-600);
+  --status-error: #d23b3b;
+  --status-info: var(--sz-blue);
+}

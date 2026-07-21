@@ -1,0 +1,35 @@
+/* Spotted Zebra — Visby CF (primary brand typeface)
+   Weights in use: Light 300, Regular 400, Medium 500, Bold 700.
+   Brand rule: never use italic/oblique styling. */
+
+@font-face {
+  font-family: "Visby CF";
+  src: url("../assets/fonts/VisbyCF-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Visby CF";
+  src: url("../assets/fonts/VisbyCF-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Visby CF";
+  src: url("../assets/fonts/VisbyCF-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Visby CF";
+  src: url("../assets/fonts/VisbyCF-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* DM Sans is the documented fallback (Google Docs / web-safe contexts). */
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap");

@@ -1,0 +1,26 @@
+/* Spotted Zebra — Effects: shadows, borders, motion
+   Shadows are soft and low (the deck spec literally says: opacity 20, angle 0,
+   distance 0, blur 20 — a soft even glow, no harsh offset). Borders are hairline.
+   Motion is calm: short ease-out fades and small lifts, never bouncy. */
+
+:root {
+  /* Even, soft shadows (no directional offset — matches brand spec) */
+  --shadow-xs: 0 0 0 1px rgba(20, 21, 26, 0.04);
+  --shadow-sm: 0 2px 12px rgba(20, 21, 26, 0.06);
+  --shadow-md: 0 4px 24px rgba(20, 21, 26, 0.08);
+  --shadow-lg: 0 8px 48px rgba(20, 21, 26, 0.10);
+  --shadow-blue: 0 8px 28px rgba(0, 106, 255, 0.28);   /* lift under blue CTAs */
+
+  --border-width: 1px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);     /* @kind other */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);  /* @kind other */
+  --dur-fast: 120ms;  /* @kind other */
+  --dur: 200ms;       /* @kind other */
+  --dur-slow: 360ms;  /* @kind other */
+
+  /* Focus */
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 2px;
+}
