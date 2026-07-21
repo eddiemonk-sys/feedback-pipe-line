@@ -47,6 +47,12 @@ export interface Config {
    * captured automatically — no emoji reaction needed.
    */
   autoCaptureChannelIds: string[];
+  /** Slack channel ID to post the weekly digest to (DS-68). Empty = digest disabled. */
+  digestSlackChannelId?: string;
+  /** Model for the weekly digest builder. Defaults to claude-haiku for speed/cost. */
+  digestModel: string;
+  /** How many days of feedback to include in each digest run. Default: 7. */
+  digestDaysBefore: number;
 }
 
 function required(name: string): string {
@@ -101,6 +107,9 @@ export function loadConfig(): Config {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
+    digestSlackChannelId: optional("DIGEST_SLACK_CHANNEL_ID"),
+    digestModel: (process.env.DIGEST_MODEL ?? "claude-haiku-4-5-20251001").trim(),
+    digestDaysBefore: Number(process.env.DIGEST_DAYS_BEFORE ?? "7"),
   };
 
   // Notion creds are only needed when actually writing to Notion.

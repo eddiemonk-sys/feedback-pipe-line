@@ -26,6 +26,9 @@ import { GranolaGate as GranolaGateImpl } from "./adapters/granola/granolaGate.j
 import { FeedbackGate as FeedbackGateImpl } from "./adapters/gate/claudeFeedbackGate.js";
 import { NullFeedbackGate } from "./adapters/gate/nullFeedbackGate.js";
 import type { FeedbackGate } from "./core/ports.js";
+import { NotionFeedbackReader } from "./adapters/notion/notionFeedbackReader.js";
+import { ClaudeDigestBuilder } from "./adapters/digest/claudeDigestBuilder.js";
+import { startDigestScheduler } from "./adapters/digest/digestScheduler.js";
 
 const SUCCESS_EMOJI = "white_check_mark";
 const FAILURE_EMOJI = "warning";
@@ -258,6 +261,20 @@ async function main(): Promise<void> {
     logger.info(`Granola poller started (folder=${config.granolaFolderId}, interval=${config.granolaPollIntervalMs}ms) — using StubGranolaClient (MCP not yet wired)`);
   } else {
     logger.info("Granola poller disabled — set ANTHROPIC_API_KEY to enable");
+  }
+
+  // Weekly digest scheduler (DS-68, DS-69). Posts to Slack every Monday 09:00 UTC.
+  if (config.digestSlackChannelId && config.notionApiKey && config.notionDatabaseId && config.anthropicApiKey) {
+    const feedbackReader = new NotionFeedbackReader(config.notionApiKey, config.notionDatabaseId);
+    const digestBuilderImpl = new ClaudeDigestBuilder(config.anthropicApiKey, config.digestModel);
+    startDigestScheduler(
+      { channelId: config.digestSlackChannelId, daysBefore: config.digestDaysBefore },
+      { feedbackReader, digestBuilder: digestBuilderImpl, slackToken: config.slackBotToken },
+      logger,
+    );
+    logger.info(`Digest scheduler started (channel=${config.digestSlackChannelId}, every Monday 09:00 UTC)`);
+  } else {
+    logger.info("Digest scheduler disabled — set DIGEST_SLACK_CHANNEL_ID to enable");
   }
 
   const shutdown = () => {
