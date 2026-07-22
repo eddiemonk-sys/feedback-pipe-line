@@ -174,6 +174,15 @@
                   <ul style="margin:0 0 10px; padding-left:16px; display:flex; flex-direction:column; gap:3px;">
                     <sc-for list="{{ row.bullets }}" as="b" hint-placeholder-count="2"><li style="font-size:13.5px; color:var(--sz-grey-700); line-height:1.45;">{{ b }}</li></sc-for>
                   </ul>
+                  <sc-if value="{{ row.isEdit }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin:-4px 0 10px;">
+                      <textarea value="{{ row.editText }}" onInput="{{ row.onEditText }}" placeholder="One bullet per line" style="width:100%; border:1px solid var(--sz-blue); border-radius:8px; padding:9px 11px; font-family:var(--font-body); font-size:13.5px; color:var(--text-strong); min-height:80px; resize:vertical; outline:none;"></textarea>
+                      <div style="display:flex; gap:8px; margin-top:6px;">
+                        <button onClick="{{ row.saveEdit }}" style="display:inline-flex; align-items:center; gap:6px; background:var(--sz-blue); color:#fff; border:none; border-radius:999px; padding:7px 14px; font-family:var(--font-display); font-weight:700; font-size:13px; cursor:pointer;">Save</button>
+                        <button onClick="{{ row.cancelEdit }}" style="background:none; border:1px solid var(--border-strong); border-radius:999px; padding:7px 14px; font-family:var(--font-display); font-weight:500; font-size:13px; cursor:pointer; color:var(--sz-grey-700);">Cancel</button>
+                      </div>
+                    </div>
+                  </sc-if>
                   <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:2px;">
                     <sc-for list="{{ row.pills }}" as="pill" hint-placeholder-count="2"><span style="{{ pill.style }}">{{ pill.label }}</span></sc-for>
                     <span style="font-size:12.5px; color:var(--sz-grey-500);">{{ row.metaLine }}</span>
@@ -672,6 +681,24 @@
     </div>
   </sc-if>
 
+  <!-- ===== ⌘K COMMAND PALETTE ===== -->
+  <sc-if value="{{ cmdkOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeCmdk }}" style="position:fixed; inset:0; background:rgba(10,10,11,.35); z-index:90; display:flex; align-items:flex-start; justify-content:center; padding-top:14vh;">
+      <div onClick="{{ stop }}" style="width:520px; max-width:92vw; background:#fff; border-radius:14px; box-shadow:0 30px 80px rgba(0,0,0,.28); overflow:hidden; animation:fbFade .15s var(--ease-out,ease);">
+        <div style="display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border-hairline);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--sz-grey-400)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input value="{{ cmdkQuery }}" onInput="{{ onCmdkInput }}" placeholder="Search commands…" autofocus="true" style="flex:1; border:none; outline:none; font-family:var(--font-body); font-size:15px; color:var(--text-strong);" />
+          <kbd style="background:var(--sz-grey-100); border:1px solid var(--border-hairline); border-radius:5px; padding:2px 7px; font-family:var(--font-display); font-weight:700; font-size:11px; color:var(--sz-grey-500);">Esc</kbd>
+        </div>
+        <div style="padding:6px;">
+          <sc-for list="{{ cmdkResults }}" as="cmd" hint-placeholder-count="5">
+            <button onClick="{{ cmd.pick }}" style="display:flex; align-items:center; width:100%; text-align:left; background:none; border:none; cursor:pointer; padding:10px 12px; border-radius:8px; font-family:var(--font-display); font-weight:500; font-size:13.5px; color:var(--text-strong);">{{ cmd.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
   <!-- ===== SHORTCUTS MODAL ===== -->
   <sc-if value="{{ shortcutsOpen }}" hint-placeholder-val="{{ false }}">
     <div onClick="{{ closeShortcuts }}" style="position:fixed; inset:0; background:rgba(10,10,11,.4); z-index:70; display:flex; align-items:center; justify-content:center;">
@@ -709,6 +736,9 @@ class Component extends DCLogic {
     addOpen: false, addForm: null, manualSeq: 0,
     triageIndex: 0,
     shortcutsOpen: false, linkOpen: false, linkSourceId: null, linkQuery: "",
+    dateFilter: null,
+    cmdkOpen: false, cmdkQuery: "",
+    triageEditId: null, triageEditText: "",
     toast: null, loaded: false
   };
 
@@ -779,6 +809,16 @@ class Component extends DCLogic {
       const q = f.search.trim().toLowerCase();
       const hay = [r.title, (r.summary || []).join(" "), r.original, (r.siblings || []).map(s => s.title + " " + (s.summary || []).join(" ")).join(" ")].join(" ").toLowerCase();
       if (!hay.includes(q)) return false;
+    }
+    if (this.state.dateFilter && r.date) {
+      const dms = new Date(r.date).getTime(), now = Date.now();
+      if (this.state.dateFilter === "7"  && now - dms > 7  * 86400000) return false;
+      if (this.state.dateFilter === "30" && now - dms > 30 * 86400000) return false;
+      if (this.state.dateFilter === "90" && now - dms > 90 * 86400000) return false;
+      if (this.state.dateFilter === "q") {
+        const n = new Date(now), qStart = new Date(n.getFullYear(), Math.floor(n.getMonth() / 3) * 3, 1);
+        if (new Date(r.date) < qStart) return false;
+      }
     }
     return true;
   }
@@ -918,11 +958,13 @@ class Component extends DCLogic {
     this.showToast(label);
   }
   handleKey(e) {
+    if (e.key === "k" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); this.setState(st => ({ cmdkOpen: !st.cmdkOpen, cmdkQuery: "" })); return; }
+    if (e.key === "Escape" && this.state.cmdkOpen) { this.setState({ cmdkOpen: false }); return; }
     if (e.key === "Escape" && this.state.media) { this.setState({ media: null }); return; }
     if (this.state.view !== "needs-review") { if (e.key === "?") this.setState({ shortcutsOpen: true }); if (e.key === "Escape") this.setState({ shortcutsOpen: false, linkOpen: false }); return; }
     const tag = (e.target.tagName || "").toLowerCase();
     if (tag === "input" || tag === "textarea" || tag === "select") return;
-    if (e.key === "Escape") { this.setState({ shortcutsOpen: false, linkOpen: false }); return; }
+    if (e.key === "Escape") { if (this.state.triageEditId) { this.setState({ triageEditId: null, triageEditText: "" }); return; } this.setState({ shortcutsOpen: false, linkOpen: false }); return; }
     if (e.key === "?") { this.setState({ shortcutsOpen: true }); return; }
     const list = this.visibleRows();
     if (!list.length) return;
@@ -934,8 +976,16 @@ class Component extends DCLogic {
     else if (k === "a") { this.triageResolve(cur.id, "approved", "Approved · moved to board"); }
     else if (k === "d") { this.triageResolve(cur.id, "dismissed", "Dismissed"); }
     else if (k === "s") { this.triageResolve(cur.id, "snoozed", "Snoozed for 7 days"); }
-    else if (k === "e") { this.showToast("Edit summary — opens inline editor"); }
+    else if (k === "e") { this.setState({ triageEditId: cur.id, triageEditText: (cur.summary || []).join("\n") }); }
   }
+  saveTriageEdit() {
+    const { triageEditId, triageEditText } = this.state;
+    if (!triageEditId) return;
+    this.rows = (this.rows || []).map(r => r.id === triageEditId ? { ...r, summary: triageEditText.split("\n").map(s => s.trim()).filter(Boolean) } : r);
+    this.setState({ triageEditId: null, triageEditText: "" });
+    this.showToast("Summary updated");
+  }
+  cancelTriageEdit() { this.setState({ triageEditId: null, triageEditText: "" }); }
 
   // ---------- view-model ----------
   buildVM(r, idx) {
@@ -1066,6 +1116,7 @@ class Component extends DCLogic {
     const idxList = this.visibleRows();
     const active = idxList[Math.min(this.state.triageIndex, idxList.length - 1)];
     const isActive = active && active.id === r.id;
+    const isEdit = this.state.triageEditId === r.id;
     return {
       id: r.id, status: r.status, statusColor: this.statusColor(r.status),
       title: r.title, bullets: r.summary || [], pills: this.rowCategories(r).map(c => this.pill(c)),
@@ -1073,6 +1124,10 @@ class Component extends DCLogic {
       sourceLabel: r.source, sourceStyle: this.sourceStyle(isSlack),
       confidence: r.confidence, flaggedBy: r.flaggedBy, judge: r.judge || "—",
       confChipLabel: this.confChip(r.confidence).label, confChipStyle: this.confChip(r.confidence).style,
+      isEdit, editText: isEdit ? this.state.triageEditText : "",
+      onEditText: (e) => this.setState({ triageEditText: e.target.value }),
+      saveEdit: () => this.saveTriageEdit(),
+      cancelEdit: () => this.cancelTriageEdit(),
       triageCardStyle: {
         position: "relative", background: "#fff", border: "1px solid " + (isActive ? "var(--sz-blue)" : "var(--border-hairline)"),
         boxShadow: isActive ? "0 0 0 3px var(--sz-blue-050), 0 6px 22px rgba(0,0,0,.06)" : "0 1px 0 rgba(0,0,0,.02)",
@@ -1166,15 +1221,19 @@ class Component extends DCLogic {
     }));
 
     const datePresets = [
-      { label: "7 days", key: "7" }, { label: "30 days", key: "30" }, { label: "90 days", key: "90" }, { label: "Quarter", key: "q" }
-    ].map(d => ({ label: d.label, set: () => this.showToast("Date preset: last " + d.label + " (demo)"),
-      style: { border: "1px solid var(--border-hairline)", background: "#fff", borderRadius: "999px", padding: "5px 11px", fontFamily: "var(--font-display)", fontWeight: 500, fontSize: "12px", color: "var(--sz-grey-700)", cursor: "pointer" } }));
+      { label: "7 days", key: "7" }, { label: "30 days", key: "30" }, { label: "90 days", key: "90" }, { label: "This quarter", key: "q" }
+    ].map(d => {
+      const on = this.state.dateFilter === d.key;
+      return { label: d.label, set: () => this.setState({ dateFilter: on ? null : d.key }),
+        style: { border: "1px solid " + (on ? "var(--sz-blue)" : "var(--border-hairline)"), background: on ? "var(--sz-blue-050)" : "#fff", borderRadius: "999px", padding: "5px 11px", fontFamily: "var(--font-display)", fontWeight: on ? 700 : 500, fontSize: "12px", color: on ? "var(--sz-blue-700)" : "var(--sz-grey-700)", cursor: "pointer" } };
+    });
 
     // active chips
     const chips = [];
     ["status", "source", "category", "audience", "confidence"].forEach(k => f[k].forEach(v => chips.push({ label: k[0].toUpperCase() + k.slice(1) + ": " + v, remove: () => this.toggleArr(k, v) })));
     if (f.client.trim()) chips.push({ label: "Company: " + f.client, remove: () => this.setFilters({ client: "" }) });
     if (f.search.trim()) chips.push({ label: "Search: " + f.search, remove: () => this.setFilters({ search: "" }) });
+    if (this.state.dateFilter) { const dl = { "7": "Last 7 days", "30": "Last 30 days", "90": "Last 90 days", "q": "This quarter" }[this.state.dateFilter]; chips.push({ label: dl, remove: () => this.setState({ dateFilter: null }) }); }
 
     const viewTitle = view === "needs-review" ? "Needs Review" : view === "snoozed" ? "Snoozed" : view === "archived" ? "Archived" : view === "deleted" ? "Deleted" : view === "crew-indigo" ? "Crew: Indigo" : "All feedback";
     const isTriage = view === "needs-review";
@@ -1241,7 +1300,7 @@ class Component extends DCLogic {
       onSortChange: (e) => this.setState({ sort: e.target.value }),
       viewTitle,
       countLabel: (chips.length ? "Showing " + vis.length + " of " + base.length + " items" : vis.length + " items"),
-      hasActiveChips: chips.length > 0, activeChips: chips, clearAll: () => this.setState({ filters: { status: [], source: [], category: [], audience: [], confidence: [], client: "", search: "" } }),
+      hasActiveChips: chips.length > 0, activeChips: chips, clearAll: () => this.setState({ filters: { status: [], source: [], category: [], audience: [], confidence: [], client: "", search: "" }, dateFilter: null }),
       isTriage, isList: !isTriage,
       crewHeaderShown: view === "crew-indigo",
       crewSubLabel: allRows.length + " items · " + nrCount + " needs review",
@@ -1258,6 +1317,36 @@ class Component extends DCLogic {
       closeLink: () => this.setState({ linkOpen: false }), stop: (e) => e.stopPropagation(),
       mediaOpen: !!md, md: md || {},
       jiraOpen: !!jira, jira: jira || {},
+      stop: (e) => e.stopPropagation(),
+      cmdkOpen: this.state.cmdkOpen,
+      cmdkQuery: this.state.cmdkQuery,
+      onCmdkInput: (e) => this.setState({ cmdkQuery: e.target.value }),
+      closeCmdk: () => this.setState({ cmdkOpen: false, cmdkQuery: "" }),
+      cmdkResults: (() => {
+        const cmds = [
+          { label: "View: All feedback",    action: () => this.setState({ view: "all" }) },
+          { label: "View: Needs Review",    action: () => this.setState({ view: "needs-review", triageIndex: 0 }) },
+          { label: "View: Crew Indigo",     action: () => this.setState({ view: "crew-indigo" }) },
+          { label: "View: Archived",        action: () => this.setState({ view: "archived" }) },
+          { label: "View: Deleted",         action: () => this.setState({ view: "deleted" }) },
+          { label: "Sort: Newest first",    action: () => this.setState({ sort: "newest" }) },
+          { label: "Sort: Oldest first",    action: () => this.setState({ sort: "oldest" }) },
+          { label: "Sort: Most raised",     action: () => this.setState({ sort: "most-raised" }) },
+          { label: "Date: Last 7 days",     action: () => this.setState({ dateFilter: "7" }) },
+          { label: "Date: Last 30 days",    action: () => this.setState({ dateFilter: "30" }) },
+          { label: "Date: Last 90 days",    action: () => this.setState({ dateFilter: "90" }) },
+          { label: "Date: This quarter",    action: () => this.setState({ dateFilter: "q" }) },
+          { label: "Clear all filters",     action: () => this.setState({ filters: { status: [], source: [], category: [], audience: [], confidence: [], client: "", search: "" }, dateFilter: null }) },
+          ...["New","Needs Review","Reviewed","Actioned"].map(s => ({ label: "Status: " + s, action: () => this.toggleArr("status", s) })),
+          ...Object.keys(this.CAT).map(c => ({ label: "Category: " + c, action: () => this.toggleArr("category", c) })),
+          ...["Recruiter","Talent Leader","Candidate","Worker","Admin"].map(a => ({ label: "Audience: " + a, action: () => this.toggleArr("audience", a) })),
+        ];
+        const q = (this.state.cmdkQuery || "").toLowerCase();
+        return cmds.filter(c => !q || c.label.toLowerCase().includes(q)).slice(0, 9).map(c => ({
+          label: c.label,
+          pick: () => { c.action(); this.setState({ cmdkOpen: false, cmdkQuery: "" }); }
+        }));
+      })(),
       openAdd: () => this.openAdd(),
       addOpen: this.state.addOpen, add: this.state.addOpen ? this.buildAddVM() : {},
       deleteOpen: !!this.state.deleteTarget, del: this.state.deleteTarget ? this.buildDeleteVM() : {},
