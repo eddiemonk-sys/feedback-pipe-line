@@ -10,9 +10,11 @@ import "dotenv/config";
 import { WebClient } from "@slack/web-api";
 import { NotionFeedbackReader } from "../src/adapters/notion/notionFeedbackReader.js";
 import { ClaudeDigestBuilder } from "../src/adapters/digest/claudeDigestBuilder.js";
+import { NotionDigestWriter } from "../src/adapters/digest/notionDigestWriter.js";
 
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
 const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
+const NOTION_DIGEST_PAGE_ID = process.env.NOTION_DIGEST_PAGE_ID;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const DIGEST_SLACK_CHANNEL_ID = process.env.DIGEST_SLACK_CHANNEL_ID;
@@ -43,3 +45,7 @@ console.log("--- END PREVIEW ---\n");
 
 await slack.chat.postMessage({ channel: DIGEST_SLACK_CHANNEL_ID, text });
 console.log(`Posted to #${DIGEST_SLACK_CHANNEL_ID}`);
+
+const notionWriter = new NotionDigestWriter(NOTION_API_KEY, NOTION_DIGEST_PAGE_ID);
+const pageUrl = await notionWriter.writeDigest(text, weekLabel);
+console.log(`Notion digest page: ${pageUrl}`);

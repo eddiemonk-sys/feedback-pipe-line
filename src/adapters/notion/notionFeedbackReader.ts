@@ -46,8 +46,9 @@ export class NotionFeedbackReader implements FeedbackDigestReader {
         const dateIso: string = props["Date"]?.date?.start ?? "";
         const customerAccount: string = props["Customer/Account"]?.rich_text?.[0]?.plain_text ?? "";
         const relatedCount: number = props["Related Feedback"]?.relation?.length ?? 0;
+        const status: string = props["Status"]?.select?.name ?? "New";
 
-        items.push({ title, summary, categories, dateIso, customerAccount, relatedCount });
+        items.push({ title, summary, categories, dateIso, customerAccount, relatedCount, status });
       }
 
       cursor = res.has_more ? res.next_cursor : undefined;

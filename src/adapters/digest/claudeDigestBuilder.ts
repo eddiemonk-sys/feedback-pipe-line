@@ -22,6 +22,7 @@ export class ClaudeDigestBuilder implements DigestBuilder {
           `Category: ${item.categories.join(", ") || "—"}\n` +
           `Customer: ${item.customerAccount || "—"}\n` +
           `Mentions: ${item.relatedCount + 1}\n` +
+          `Status: ${item.status ?? "New"}\n` +
           item.summary,
       )
       .join("\n\n");
@@ -44,6 +45,7 @@ Write a concise, skimmable Slack digest. Rules:
 - Group remaining items into 3–5 named themes with *bold* headers
 - 2–3 bullet points per theme (• prefix), one sentence each — be specific, name customers and deadlines
 - Close with: "_Category breakdown: Feature Request: N · Bug: N · UX: N · ..._" (include all categories with count > 0)
+- After the category breakdown, add a *🔄 Close the Loop* section ONLY if any items have Status "Done", "Backlog", or "Won't Fix". One bullet per such item: "✅ [Title] — Done" or "📥 [Title] — Backlogged". Omit this section entirely if no items have those statuses.
 - Use Slack markdown: *bold*, _italic_, • bullets. No markdown headers (# ---).
 - 350–500 words total. No generic filler — every bullet should be something the product team can act on.`,
         },

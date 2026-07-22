@@ -1,5 +1,5 @@
 import { WebClient } from "@slack/web-api";
-import type { FeedbackDigestReader, DigestBuilder } from "../../core/digest.js";
+import type { FeedbackDigestReader, DigestBuilder, DigestNotionWriter } from "../../core/digest.js";
 
 export interface DigestSchedulerConfig {
   channelId: string;
@@ -10,6 +10,7 @@ export interface DigestSchedulerDeps {
   feedbackReader: FeedbackDigestReader;
   digestBuilder: DigestBuilder;
   slackToken: string;
+  notionWriter?: DigestNotionWriter;
 }
 
 export interface DigestLogger {
@@ -52,6 +53,10 @@ export function startDigestScheduler(
       const text = await deps.digestBuilder.buildDigest(items, currentWeekLabel());
       await slack.chat.postMessage({ channel: config.channelId, text });
       logger.info("Digest scheduler: posted to Slack", { channelId: config.channelId });
+      if (deps.notionWriter) {
+        const url = await deps.notionWriter.writeDigest(text, currentWeekLabel());
+        logger.info("Digest scheduler: written to Notion", { url });
+      }
     } catch (err) {
       logger.error("Digest scheduler: run failed", { error: String(err) });
     }

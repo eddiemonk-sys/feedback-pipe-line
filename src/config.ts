@@ -53,6 +53,8 @@ export interface Config {
   digestModel: string;
   /** How many days of feedback to include in each digest run. Default: 7. */
   digestDaysBefore: number;
+  /** Notion page ID to update in-place with each digest (DS-66). Unset = creates a new page each run. */
+  notionDigestPageId?: string;
 }
 
 function required(name: string): string {
@@ -110,6 +112,7 @@ export function loadConfig(): Config {
     digestSlackChannelId: optional("DIGEST_SLACK_CHANNEL_ID"),
     digestModel: (process.env.DIGEST_MODEL ?? "claude-haiku-4-5-20251001").trim(),
     digestDaysBefore: Number(process.env.DIGEST_DAYS_BEFORE ?? "7"),
+    notionDigestPageId: optional("NOTION_DIGEST_PAGE_ID"),
   };
 
   // Notion creds are only needed when actually writing to Notion.

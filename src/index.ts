@@ -28,6 +28,7 @@ import { NullFeedbackGate } from "./adapters/gate/nullFeedbackGate.js";
 import type { FeedbackGate } from "./core/ports.js";
 import { NotionFeedbackReader } from "./adapters/notion/notionFeedbackReader.js";
 import { ClaudeDigestBuilder } from "./adapters/digest/claudeDigestBuilder.js";
+import { NotionDigestWriter } from "./adapters/digest/notionDigestWriter.js";
 import { startDigestScheduler } from "./adapters/digest/digestScheduler.js";
 
 const SUCCESS_EMOJI = "white_check_mark";
@@ -269,9 +270,10 @@ async function main(): Promise<void> {
   if (config.digestSlackChannelId && config.notionApiKey && config.notionDatabaseId && config.anthropicApiKey) {
     const feedbackReader = new NotionFeedbackReader(config.notionApiKey, config.notionDatabaseId);
     const digestBuilderImpl = new ClaudeDigestBuilder(config.anthropicApiKey, config.digestModel);
+    const notionWriter = new NotionDigestWriter(config.notionApiKey, config.notionDigestPageId);
     startDigestScheduler(
       { channelId: config.digestSlackChannelId, daysBefore: config.digestDaysBefore },
-      { feedbackReader, digestBuilder: digestBuilderImpl, slackToken: config.slackBotToken },
+      { feedbackReader, digestBuilder: digestBuilderImpl, slackToken: config.slackBotToken, notionWriter },
       logger,
     );
     logger.info(`Digest scheduler started (channel=${config.digestSlackChannelId}, every Monday 09:00 UTC)`);
