@@ -17,6 +17,7 @@
     "correction-log": "tsx scripts/correctionLog.ts",
     "migrate:categories": "tsx scripts/migrateCategoriesToMultiSelect.ts",
     "digest": "tsx scripts/weeklyDigest.ts",
+    "close-loop": "tsx scripts/closeLoop.ts",
     "eval:gate": "tsx scripts/runEval.ts gate",
     "eval:enricher": "tsx scripts/runEval.ts enricher",
     "eval:judge": "tsx scripts/runEval.ts judge"
