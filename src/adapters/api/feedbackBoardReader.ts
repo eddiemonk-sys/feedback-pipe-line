@@ -50,19 +50,17 @@ function splitSummary(text: string): string[] {
 function classifyCrew(title: string, summary: string[], original: string): "Indigo" | "Unknown" {
   const text = [title, ...summary, original].join(" ").toLowerCase();
 
-  // Positive signals from the Indigo golden criteria
+  // Positive signals from the Indigo golden criteria — kept specific to avoid false positives
   const indigoSignals = [
-    "ai shortlist", "shortlist", "shortlisting",
-    "screening criteria", "criteria",
-    "cv upload", "cv parsing", "cv process",
-    "candidate scor", "scoring",
-    "evidence view", "evidence against",
-    "results extract",
+    "ai shortlist",
+    "shortlist", "shortlisting",
+    "screening criteria",
+    "cv upload", "cv parsing", "cv process", "application import",
+    "candidate scoring", "candidate score", "candidate rank",
+    "evidence view", "evidence against", "criteria evidence",
+    "results extract", "shortlist export", "shortlist download",
     "kpi report", "usage report", "usage analytics",
-    "candidate portal",
-    "panel interview", "case study eval",
-    "assessments", "hiring manager",
-    "users & access", "user management",
+    "users & access", "user management", "user permissions",
   ];
 
   // Explicit non-Indigo signals (match → Unknown, even if positive signal also present)
