@@ -29,3 +29,12 @@ overlaps, don't let it sprawl. Full rationale: `DISTILLED-RULES-PRD.md`.
   message is about setting up a customer on a feature, preparing a go-live, running a socialisation
   call, or working through configuration questions — use Onboarding / Setup, not Other. The scope
   is broader than initial IT setup: any "getting the customer running with a capability" counts.
+
+- **P6 — Feature Request, not Candidate Experience, for platform display or configuration gaps.**
+  When feedback is about what candidates SEE or EXPERIENCE because a platform feature is missing
+  or not configurable (e.g. wrong company name displayed, branding not per sub-brand), classify
+  as Feature Request — not Candidate Experience. Candidate Experience is for direct issues with the
+  assessment or interview experience itself (confusing instructions, inaccessible flow, unfair
+  prompts). Do NOT apply this rule when the need is driven by a legal or compliance requirement
+  (data privacy, GDPR, regulatory obligation) — in those cases, Compliance / Legal / Governance
+  takes precedence even if a platform feature must also be built.

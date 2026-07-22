@@ -20,7 +20,10 @@
     "close-loop": "tsx scripts/closeLoop.ts",
     "eval:gate": "tsx scripts/runEval.ts gate",
     "eval:enricher": "tsx scripts/runEval.ts enricher",
-    "eval:judge": "tsx scripts/runEval.ts judge"
+    "eval:judge": "tsx scripts/runEval.ts judge",
+    "eval:batch": "tsx scripts/runEval.ts --mode batch",
+    "eval:thread": "tsx scripts/runEval.ts --mode thread",
+    "eval:granola-gate": "tsx scripts/runEval.ts --mode granolaGate"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.107.0",
