@@ -32,6 +32,20 @@ export interface CategoryCoverage {
   reviewedCount: number; // of those, how many have actually been reviewed
 }
 
+export interface CategoryTaxonomyQuality {
+  category: FeedbackCategory;
+  /** Rows where AI or human (or both) tagged this category, among reviewed rows only. */
+  reviewedCount: number;
+  /** tp / (tp + fp) — null when AI never predicted this category on reviewed rows. */
+  precision: number | null;
+  /** tp / (tp + fn) — null when human never tagged this category on reviewed rows. */
+  recall: number | null;
+  /** AI said yes, human said no. */
+  fpCount: number;
+  /** Human said yes, AI said no. */
+  fnCount: number;
+}
+
 export interface AccuracyReport {
   totalRows: number;
   categoryReviewedCount: number;
@@ -42,6 +56,8 @@ export interface AccuracyReport {
   confidenceCalibration: ConfidenceCalibration[];
   /** Every taxonomy category, always — including ones with zero captures, so gaps are visible. */
   categoryCoverage: CategoryCoverage[]; // sorted reviewedCount ascending, least-covered first
+  /** Per-category precision/recall over reviewed rows — sorted by total errors (fp+fn) descending. */
+  taxonomyQuality: CategoryTaxonomyQuality[];
 }
 
 function categoriesMatch(a: FeedbackCategory[], b: FeedbackCategory[]): boolean {
@@ -92,6 +108,25 @@ export function computeAccuracyReport(rows: ReviewedRow[]): AccuracyReport {
     return { category, totalCaptured: captured.length, reviewedCount: reviewed.length };
   }).sort((a, b) => a.reviewedCount - b.reviewedCount);
 
+  const taxonomyQuality: CategoryTaxonomyQuality[] = CATEGORIES.map((category) => {
+    let tp = 0, fp = 0, fn = 0;
+    for (const r of categoryReviewed) {
+      const aiHas = r.aiSuggestedCategories.includes(category);
+      const humanHas = r.categories.includes(category);
+      if (aiHas && humanHas) tp++;
+      else if (aiHas && !humanHas) fp++;
+      else if (!aiHas && humanHas) fn++;
+    }
+    return {
+      category,
+      reviewedCount: tp + fp + fn,
+      precision: (tp + fp) > 0 ? tp / (tp + fp) : null,
+      recall: (tp + fn) > 0 ? tp / (tp + fn) : null,
+      fpCount: fp,
+      fnCount: fn,
+    };
+  }).sort((a, b) => (b.fpCount + b.fnCount) - (a.fpCount + a.fnCount));
+
   return {
     totalRows: rows.length,
     categoryReviewedCount: categoryReviewed.length,
@@ -101,5 +136,6 @@ export function computeAccuracyReport(rows: ReviewedRow[]): AccuracyReport {
     summaryFaithfulRate: summaryReviewed.length ? summaryFaithful.length / summaryReviewed.length : null,
     confidenceCalibration,
     categoryCoverage,
+    taxonomyQuality,
   };
 }

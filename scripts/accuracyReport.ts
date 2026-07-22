@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { Client } from "@notionhq/client";
-import { computeAccuracyReport, type ReviewedRow } from "../src/core/accuracyReport.js";
+import { computeAccuracyReport, type ReviewedRow, type CategoryTaxonomyQuality } from "../src/core/accuracyReport.js";
 import type { FeedbackCategory, ConfidenceLevel } from "../src/core/ports.js";
 
 /**
@@ -94,6 +94,23 @@ function activityBlocks(rows: ActivityRow[]): ReturnType<typeof heading2>[] {
     ? rows.map((r) => `${r.dateIso} | ${r.channelName} | ${r.category} | ${r.confidence}`)
     : ["No recent activity."];
   return [heading2("Recent Activity (last 20)"), ...lines.map(paragraph)];
+}
+
+function taxonomyQualityBlocks(quality: CategoryTaxonomyQuality[]): ReturnType<typeof heading2 | typeof paragraph>[] {
+  const pct = (n: number | null) => n === null ? "—" : `${Math.round(n * 100)}%`;
+  const withErrors = quality.filter((q) => q.reviewedCount > 0);
+  const lines = withErrors.length
+    ? withErrors.map((q) => {
+        const errors = q.fpCount + q.fnCount;
+        const errStr = errors > 0 ? ` ⚠ FP:${q.fpCount} FN:${q.fnCount}` : "";
+        return `${q.category}: prec ${pct(q.precision)}  rec ${pct(q.recall)}${errStr}  (${q.reviewedCount} reviewed)`;
+      })
+    : ["No reviewed rows yet — run some reviews and re-generate."];
+  return [
+    heading2("Taxonomy quality per category"),
+    paragraph("Sorted by error count (FP = AI over-tagged, FN = AI under-tagged). Only categories with ≥1 reviewed row shown."),
+    ...lines.map(paragraph),
+  ];
 }
 
 async function fetchReviewedRows(): Promise<ReviewedRow[]> {
@@ -274,6 +291,7 @@ async function main(): Promise<void> {
 
   const blocks = [
     ...reportBlocks(report),
+    ...taxonomyQualityBlocks(report.taxonomyQuality),
     ...reviewQueueBlocks(needsReviewRows),
     ...correctionsBlocks(corrections),
     ...activityBlocks(activity),
