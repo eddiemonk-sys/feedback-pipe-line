@@ -7,9 +7,9 @@
   "expectedOutput": {
     "itemCount": 3,
     "items": [
-      { "summaryContains": ["no-decision", "outcome"], "categories": ["Interview Outcomes"] },
-      { "summaryContains": ["self-scheduling", "final"], "categories": ["Scheduling"] },
-      { "summaryContains": ["auto-archive", "30 days"], "categories": ["Candidate Management"] }
+      { "summaryContains": ["no-decision", "outcome"], "categories": ["Feature Request"] },
+      { "summaryContains": ["self-scheduling", "final"], "categories": ["Feature Request"] },
+      { "summaryContains": ["auto-archive", "30 days"], "categories": ["Feature Request"] }
     ]
   }
 }

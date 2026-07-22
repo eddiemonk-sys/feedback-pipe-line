@@ -1,0 +1,14 @@
+{
+  "description": "Internal weekly DS standup — should be skipped, no customer feedback",
+  "source": "data/granola-fixtures/no-001.md",
+  "input": {
+    "title": "Eddie / James - Weekly DS Standup",
+    "markdownContent": "### Updates\n\n- Enricher v17 shipped last week — accuracy at 100% on gold set\n- Gate prompt at v7, F1 at 87% — looking at ceiling on remaining false negatives\n- Thread capture deployed and running on Heroku\n- Jira slices DS-73 through DS-80 scoped and ready to start\n\n### Blockers\n\n- Granola MCP auth still pending\n- Waiting on Notion schema review before DS-77 can start\n\n### This Week\n\n- Start DS-73 Granola ingestion\n- DS-76 taxonomy confirmation",
+    "participants": ["Eddie Monk (Spotted Zebra)", "James (Spotted Zebra)"]
+  },
+  "expectedOutput": {
+    "shouldSkip": true,
+    "itemCount": 0,
+    "skipReason": "All participants are Spotted Zebra employees and content is internal process/status — no customer-reported feedback present"
+  }
+}

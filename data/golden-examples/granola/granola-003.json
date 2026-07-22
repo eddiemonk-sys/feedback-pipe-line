@@ -1,0 +1,36 @@
+{
+  "description": "Casual ops catch-up with client — product feedback buried in unfocused conversation",
+  "source": "data/granola-fixtures/messy-001.md",
+  "input": {
+    "title": "Eddie / Dan Fogarty - Catch Up",
+    "markdownContent": "### Updates from Dan\n\n- Hiring volumes are down this quarter — cost-cutting, platform usage lower than expected\n- One warehouse supervisor complained that the assessment \"felt like a school exam\" and two warehouse candidates said similar things\n- Mobile experience is \"a bit janky\" on older Android phones — a few candidates mentioned it\n- There's a version of the assessment in Polish that has some translation errors — one candidate mentioned it, Dan didn't have a way to flag it\n- He asked if there's a way to share results directly with a line manager without them needing a full account\n\n### Random Topics\n\n- Dan is personally interested in whether the platform will do blue-collar assessments\n- He thinks the platform pricing is fair but says his manager will push back at renewal",
+    "participants": ["Eddie Monk (Spotted Zebra)", "Dan Fogarty (client, Ops)"]
+  },
+  "expectedOutput": {
+    "shouldSkip": false,
+    "itemCount": 4,
+    "items": [
+      {
+        "summaryContains": ["assessment", "exam", "tone", "warehouse"],
+        "audience": "Talent Leader",
+        "type": "UX / Usability"
+      },
+      {
+        "summaryContains": ["mobile", "Android", "janky"],
+        "audience": "Talent Leader",
+        "type": "Bug / Broken"
+      },
+      {
+        "summaryContains": ["Polish", "translation"],
+        "audience": "Talent Leader",
+        "type": "Bug / Broken"
+      },
+      {
+        "summaryContains": ["line manager", "results", "account"],
+        "audience": "Talent Leader",
+        "type": "Feature Request"
+      }
+    ],
+    "note": "Non-feedback content (lower hiring volumes, pricing concern, personal curiosity about blue-collar) must not become capture rows"
+  }
+}

@@ -9,7 +9,7 @@
     "items": [
       {
         "summaryContains": ["bulk candidate import", "ATS", "October"],
-        "categories": ["Integrations"]
+        "categories": ["Feature Request"]
       }
     ],
     "preambleContextContains": "NIQ"

@@ -80,6 +80,32 @@ function classifyCrew(title: string, summary: string[], original: string): "Indi
   return "Indigo";
 }
 
+// Rule-based capability classifier — sub-areas within each crew.
+// Indigo sub-areas from docs/crew-criteria-indigo.md; other crews return "" until criteria exist.
+// Order matters: more specific signals first.
+function classifyCapability(crew: string, title: string, summary: string[], original: string): string {
+  if (crew !== "Indigo") return "";
+
+  const text = [title, ...summary, original].join(" ").toLowerCase();
+
+  if (["kpi report", "usage report", "usage analytics"].some(s => text.includes(s)))
+    return "Reporting";
+  if (["users & access", "user management", "user permissions", "access control"].some(s => text.includes(s)))
+    return "User Management";
+  if (["results extract", "shortlist export", "shortlist download"].some(s => text.includes(s)))
+    return "Results & Export";
+  if (["evidence view", "evidence against", "criteria evidence"].some(s => text.includes(s)))
+    return "Evidence View";
+  if (["candidate scoring", "candidate score", "candidate rank"].some(s => text.includes(s)))
+    return "Scoring";
+  if (["cv upload", "cv parsing", "cv process", "application import"].some(s => text.includes(s)))
+    return "CV Processing";
+  if (["screening criteria", "shortlisting criteria", "criteria suggestion"].some(s => text.includes(s)))
+    return "Criteria";
+
+  return "AI Shortlist";
+}
+
 function deriveKind(props: Record<string, any>): "normal" | "master" | "batch" | "thread" {
   if ((props["Siblings"]?.relation?.length ?? 0) > 0) return "batch";
   if ((props["Threads"]?.relation?.length ?? 0) > 0) return "thread";
@@ -99,6 +125,9 @@ function mapPage(page: Record<string, any>): BoardRow | null {
     props["Summary"]?.rich_text?.[0]?.plain_text ??
     props["AI Suggested Summary"]?.rich_text?.[0]?.plain_text ?? "";
   const dateIso: string = props["Date"]?.date?.start ?? "";
+  const messageText = props["Message"]?.title?.[0]?.plain_text ?? "";
+  const summarySplit = splitSummary(summaryRaw);
+  const crew = classifyCrew(title, summarySplit, messageText);
 
   return {
     id: page["id"] as string,
@@ -115,13 +144,13 @@ function mapPage(page: Record<string, any>): BoardRow | null {
     date: dateIso,
     rel: relativeTime(dateIso),
     confidence: props["Enrichment Confidence"]?.select?.name ?? "Medium",
-    crew: classifyCrew(title, splitSummary(summaryRaw), props["Message"]?.title?.[0]?.plain_text ?? ""),
-    capability: "",
+    crew,
+    capability: classifyCapability(crew, title, summarySplit, messageText),
     title,
     categories: (props["Categories"]?.multi_select ?? []).map((o: any) => o.name as string),
-    summary: splitSummary(summaryRaw),
+    summary: summarySplit,
     messageUrl: props["Message URL"]?.url ?? undefined,
-    original: props["Message"]?.title?.[0]?.plain_text ?? "",
+    original: messageText,
     judge: props["Judge Rationale"]?.rich_text?.[0]?.plain_text || undefined,
     summaryVerdict: props["Summary Verdict"]?.select?.name ?? null,
     demand: props["Related Count"]?.rollup?.number || undefined,

@@ -1,0 +1,35 @@
+{
+  "description": "QBR with Priya Sharma — four distinct product feedback items clearly stated by a Talent Leader",
+  "source": "data/granola-fixtures/feedback-001.md",
+  "input": {
+    "title": "Eddie / Priya Sharma - Quarterly Business Review: Assessment Platform",
+    "markdownContent": "### What's Working\n\n- Candidate completion rates improved after we switched to adaptive format\n- Hiring managers trust the shortlist more than they did with CV screening alone\n\n### Feedback\n\n- The job family mapping is still too manual — Priya's team spends two hours per role configuring which dimensions to weight, and it doesn't carry over when they clone a similar role\n- Candidates are dropping off at the video question stage — completion drops from 85% to 61% at that point\n- Report language is too technical for hiring managers who don't have an HR background — they see \"norm group percentile\" and disengage\n- No way to bulk-download candidate reports for a hiring panel — they have to open each one individually",
+    "participants": ["Eddie Monk (Spotted Zebra)", "Priya Sharma (client, Head of TA, financial services)"]
+  },
+  "expectedOutput": {
+    "shouldSkip": false,
+    "itemCount": 4,
+    "items": [
+      {
+        "summaryContains": ["job family", "manual", "clone"],
+        "audience": "Talent Leader",
+        "type": "Feature Request"
+      },
+      {
+        "summaryContains": ["video", "drop", "completion"],
+        "audience": "Talent Leader",
+        "type": "UX / Usability"
+      },
+      {
+        "summaryContains": ["report", "technical", "hiring manager"],
+        "audience": "Talent Leader",
+        "type": "UX / Usability"
+      },
+      {
+        "summaryContains": ["bulk", "download", "reports"],
+        "audience": "Talent Leader",
+        "type": "Feature Request"
+      }
+    ]
+  }
+}

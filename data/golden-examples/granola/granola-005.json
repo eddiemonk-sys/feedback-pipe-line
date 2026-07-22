@@ -1,0 +1,22 @@
+{
+  "description": "Platform outage impact call — severity critical reliability report from a client",
+  "source": "data/granola-fixtures/urgent-001.md",
+  "input": {
+    "title": "Eddie / Yemi Adeyemi / Rachel - Emergency Call: Platform Outage Impact",
+    "markdownContent": "### Situation\n\n- Horizon Group had an assessment window running this morning — 80 candidates scheduled\n- Platform was down from 8:45am to 11:20am — candidates got error pages\n- 47 candidates attempted to access and got errors\n- 11 candidates have already emailed to say they won't reschedule\n- The role closes end of this week — no time for a second window before deadline\n\n### What Yemi Needs\n\n- An apology from a senior Spotted Zebra contact\n- A way to extend the assessment window and re-invite only affected candidates\n- Confirmation this won't affect contract terms given the SLA breach\n- Some way to tell candidates what happened without blaming the platform",
+    "participants": ["Eddie Monk (Spotted Zebra)", "Yemi Adeyemi (client, Head of TA, Horizon Group)", "Rachel (Spotted Zebra)"]
+  },
+  "expectedOutput": {
+    "shouldSkip": false,
+    "itemCount": 1,
+    "items": [
+      {
+        "summaryContains": ["outage", "platform down", "candidates", "error"],
+        "audience": "Talent Leader",
+        "type": "Bug / Broken",
+        "severity": "Critical"
+      }
+    ],
+    "note": "Single item — the outage is one event. The missing re-invite capability is a secondary feature gap surfaced by this incident but should be captured as a separate item if the enricher identifies it as distinct."
+  }
+}

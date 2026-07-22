@@ -1,0 +1,14 @@
+{
+  "description": "Internal contract renewal prep — logistics and action items only, should be skipped",
+  "source": "data/granola-fixtures/action-001.md",
+  "input": {
+    "title": "Eddie / Sarah / Tom - Contract Renewal Prep: Horizon Group",
+    "markdownContent": "### Renewal Strategy\n\n- Price increase of 8% discussed\n- Key champion is Yemi Adeyemi, Head of TA — positive in every conversation but doesn't control budget\n- Budget holder is the CFO who we've never spoken to\n- Strong usage data: 340 assessments, 91% hiring manager satisfaction\n\n### Open Items\n\n- ROI deck not ready — Sarah finishing it today\n- Need to confirm Workday integration is stable — issue reported 3 weeks ago\n- Tom to confirm reference letter was sent to Yemi in May\n\n### Next Steps\n\n- Sarah to send ROI deck by tonight\n- Tom to confirm Workday integration issue resolved\n- Eddie to prep concession options in case CFO pushes on price",
+    "participants": ["Eddie Monk (Spotted Zebra)", "Sarah (Spotted Zebra)", "Tom (Spotted Zebra)"]
+  },
+  "expectedOutput": {
+    "shouldSkip": true,
+    "itemCount": 0,
+    "skipReason": "All participants are Spotted Zebra employees and content is internal commercial prep — no customer-reported product feedback. Workday integration mention is an internal action item, not a customer complaint."
+  }
+}

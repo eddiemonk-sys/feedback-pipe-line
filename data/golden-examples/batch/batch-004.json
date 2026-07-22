@@ -9,7 +9,7 @@
     "items": [
       {
         "summaryContains": ["colour-coded", "scorecard", "panel review"],
-        "categories": ["Scorecards"]
+        "categories": ["Feature Request"]
       }
     ]
   }

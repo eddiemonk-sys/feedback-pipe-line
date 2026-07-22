@@ -9,11 +9,11 @@
     "items": [
       {
         "summaryContains": ["language", "stage", "English", "German"],
-        "categories": ["Internationalisation"]
+        "categories": ["Feature Request"]
       },
       {
         "summaryContains": ["scoring", "weight", "senior"],
-        "categories": ["Assessment Configuration"]
+        "categories": ["Feature Request"]
       }
     ],
     "preambleContextContains": "DTG"
