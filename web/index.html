@@ -792,6 +792,7 @@ class Component extends DCLogic {
     if (this.state.view === "deleted") return rows.filter(r => rem[r.id] === "deleted");
     rows = rows.filter(r => !rem[r.id]);
     if (this.state.view === "needs-review") rows = rows.filter(r => r.status === "Needs Review");
+    if (this.state.view === "crew-indigo") rows = rows.filter(r => r.crew === "Indigo");
     return rows;
   }
   visibleRows() {
@@ -955,7 +956,7 @@ class Component extends DCLogic {
       crewLabel: (r.crew || "Indigo") + " · " + (r.capability || "—"),
       source: r.source, sourceLabel: r.source, sourceStyle: this.sourceStyle(isSlack),
       messageUrl: r.messageUrl || "#",
-      channelOrMeeting: isSlack ? r.channel : r.meetingTitle,
+      channelOrMeeting: isSlack ? r.channel : (r.meetingTitle || r.channel || ""),
       original: r.original || "", judge: r.judge || "—", confidence: r.confidence || "—",
       flaggedBy: r.flaggedBy || "—", hasImage: !!r.image,
       summaryVerdictLabel: r.summaryVerdict || "Not reviewed",
@@ -1117,7 +1118,7 @@ class Component extends DCLogic {
     });
 
     const crewDef = [
-      { label: "Indigo", count: allRows.length, dot: "var(--sz-blue)", key: "crew-indigo", enabled: true },
+      { label: "Indigo", count: allRows.filter(r => r.crew === "Indigo").length, dot: "var(--sz-blue)", key: "crew-indigo", enabled: true },
       { label: "Crew B · soon", count: "", dot: "var(--sz-grey-300)", enabled: false },
       { label: "Crew C · soon", count: "", dot: "var(--sz-grey-300)", enabled: false }
     ];
@@ -1137,7 +1138,7 @@ class Component extends DCLogic {
     const catList = Object.keys(this.CAT);
     const facetsDef = [
       { key: "status", label: "Status", options: ["New", "Needs Review", "Reviewed", "Actioned"] },
-      { key: "source", label: "Source", options: ["Slack", "Granola"] },
+      { key: "source", label: "Source", options: ["Slack", "Granola", "Manual"] },
       { key: "category", label: "Category", options: catList },
       { key: "audience", label: "Audience", options: ["Recruiter", "Talent Leader", "Candidate", "Worker", "Admin", "Unknown"] },
       { key: "confidence", label: "Confidence", options: ["High", "Medium", "Low"] }
@@ -1193,7 +1194,7 @@ class Component extends DCLogic {
         }
         md = {
           isThread, title, bullets, original,
-          channelOrMeeting: (mr.source === "Slack" ? mr.channel : mr.meetingTitle),
+          channelOrMeeting: (mr.source === "Slack" ? mr.channel : (mr.meetingTitle || mr.channel || "")),
           threadAuthor: tAuthor, threadRel: tRel, threadText: tText,
           isImage: !!(mm && mm.type === "image"), isVideo: !!(mm && mm.type === "video"),
           slotId, mediaLabel: mm ? mm.label : "",
