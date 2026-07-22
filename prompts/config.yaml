@@ -2,4 +2,4 @@ gate: v9
 enricher: v21
 judge: v4
 threadRouter: v1
-granolaGate: v1
+granolaGate: v3
