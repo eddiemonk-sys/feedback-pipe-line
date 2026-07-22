@@ -50,10 +50,11 @@ function splitSummary(text: string): string[] {
 function classifyCrew(title: string, summary: string[], original: string): "Indigo" | "Unknown" {
   const text = [title, ...summary, original].join(" ").toLowerCase();
 
-  // Positive signals from the Indigo golden criteria — kept specific to avoid false positives
+  // Positive signals from the Indigo golden criteria — specific phrases only.
+  // "shortlist" alone is too broad (it's the product name); require "ai shortlist" or
+  // a specific sub-feature phrase instead.
   const indigoSignals = [
     "ai shortlist",
-    "shortlist", "shortlisting",
     "screening criteria",
     "cv upload", "cv parsing", "cv process", "application import",
     "candidate scoring", "candidate score", "candidate rank",
