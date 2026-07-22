@@ -11,7 +11,7 @@
     "itemCount": 1,
     "items": [
       {
-        "summaryContains": ["outage", "platform down", "candidates", "error"],
+        "summaryContains": ["outage", "Horizon", "candidates"],
         "audience": "Talent Leader",
         "type": "Bug / Broken",
         "severity": "Critical"

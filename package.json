@@ -23,7 +23,8 @@
     "eval:judge": "tsx scripts/runEval.ts judge",
     "eval:batch": "tsx scripts/runEval.ts --mode batch",
     "eval:thread": "tsx scripts/runEval.ts --mode thread",
-    "eval:granola-gate": "tsx scripts/runEval.ts --mode granolaGate"
+    "eval:granola-gate": "tsx scripts/runEval.ts --mode granolaGate",
+    "eval:granola-enricher": "tsx scripts/runEval.ts --mode granolaEnricher"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.107.0",

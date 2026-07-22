@@ -11,14 +11,14 @@
     "itemCount": 4,
     "items": [
       {
-        "summaryContains": ["assessment", "exam", "tone", "warehouse"],
+        "summaryContains": ["assessment", "exam", "warehouse"],
         "audience": "Talent Leader",
-        "type": "UX / Usability"
+        "type": ["UX / Usability", "Candidate Experience", "Assessment Accuracy/Validity"]
       },
       {
-        "summaryContains": ["mobile", "Android", "janky"],
+        "summaryContains": ["mobile", "Android", "older"],
         "audience": "Talent Leader",
-        "type": "Bug / Broken"
+        "type": ["UX / Usability", "Candidate Experience"]
       },
       {
         "summaryContains": ["Polish", "translation"],

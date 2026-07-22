@@ -504,6 +504,154 @@ async function evalGranolaGate(config: EvalConfig) {
   return { summary, rows: results };
 }
 
+// ─── Granola Enricher Eval ────────────────────────────────────────────────────
+//
+// Runs the full Granola pipeline (gate → enricher) against the 5 detailed golden
+// examples in data/golden-examples/granola/. Each fixture is binary: PASS only if
+// ALL of the following hold:
+//   - shouldSkip=true → gate rejects it
+//   - shouldSkip=false → gate accepts it AND enricher produces the right item count
+//     AND every expected item is matched by type + all summaryContains keywords
+// Threshold: ≥80% (4/5).
+
+async function evalGranolaEnricher(config: EvalConfig) {
+  if (!config.anthropicApiKey) throw new Error("ANTHROPIC_API_KEY required.");
+
+  const exampleDir = "./data/golden-examples/granola";
+  const exampleFiles = readdirSync(exampleDir).filter((f) => f.endsWith(".json")).sort();
+
+  const gateModel = process.env.GATE_MODEL?.trim() || "claude-haiku-4-5-20251001";
+  const enricherModel = process.env.ENRICHER_MODEL?.trim() || "claude-sonnet-4-6";
+  const styleGuide = loadGuideFile(config.enrichmentStyleGuidePath);
+
+  const gate = new GranolaGate(
+    new AnthropicLLMClient(config.anthropicApiKey, gateModel),
+    loadPrompt("granolaGate"),
+  );
+  const enricher = new Enricher(
+    new AnthropicLLMClient(config.anthropicApiKey, enricherModel),
+    loadPrompt("enricher"),
+    styleGuide,
+  );
+  const promptVersion = readPromptVersion("enricher");
+
+  let pass = 0;
+  const results: unknown[] = [];
+
+  console.log(`\n=== Granola Enricher Eval ===`);
+  console.log(`Prompt version: ${promptVersion}`);
+
+  for (const file of exampleFiles) {
+    const example = JSON.parse(readFileSync(`${exampleDir}/${file}`, "utf8")) as {
+      description: string;
+      input: { title: string; markdownContent: string; participants?: string[] };
+      expectedOutput: {
+        shouldSkip: boolean;
+        itemCount: number;
+        items?: Array<{ summaryContains: string[]; type: string | string[]; audience?: string; severity?: string }>;
+      };
+    };
+    const { input, expectedOutput } = example;
+    const participants = input.participants ?? [];
+
+    // Step 1 — gate decision
+    const gateResult = await gate.classify(input.title, input.markdownContent, participants).catch(() => null);
+    const gateCaptures = gateResult?.shouldCapture ?? true; // fail-open
+
+    if (expectedOutput.shouldSkip) {
+      // Gate must reject
+      const correct = !gateCaptures;
+      if (correct) pass++;
+      results.push({ file, expectedSkip: true, gateCaptures, pass: correct, gateReason: gateResult?.reason });
+      console.log(`  [${correct ? "PASS" : "FAIL"}] ${file}: gate ${correct ? "correctly skipped" : "captured but should have skipped"}`);
+      continue;
+    }
+
+    // Gate must accept
+    if (!gateCaptures) {
+      results.push({ file, expectedSkip: false, gateCaptures, pass: false, reason: "Gate rejected but should capture", gateReason: gateResult?.reason });
+      console.log(`  [FAIL] ${file}: gate rejected but should capture`);
+      continue;
+    }
+
+    // Step 2 — enrichment
+    const enrichedItems = await enricher.enrich(input.markdownContent, input.title).catch(() => null);
+
+    if (!enrichedItems || enrichedItems.length === 0) {
+      results.push({ file, expectedSkip: false, gateCaptures, pass: false, reason: "Enricher returned no items" });
+      console.log(`  [FAIL] ${file}: enricher returned no items`);
+      continue;
+    }
+
+    // Check item count — require at least as many items as expected.
+    // Extra items beyond the expected count are tolerated (over-capturing valid feedback
+    // is acceptable; missing expected items is not).
+    if (enrichedItems.length < expectedOutput.itemCount) {
+      results.push({
+        file, expectedSkip: false, gateCaptures, pass: false,
+        reason: `Too few items: expected at least ${expectedOutput.itemCount}, got ${enrichedItems.length}`,
+        got: enrichedItems.map((i) => ({ type: i.categories[0], summary: i.summary.slice(0, 80) })),
+      });
+      console.log(`  [FAIL] ${file}: expected at least ${expectedOutput.itemCount} items, got ${enrichedItems.length}`);
+      continue;
+    }
+
+    // Check each expected item has a matching result item (order-insensitive)
+    const expectedItems = expectedOutput.items ?? [];
+    const usedIndices = new Set<number>();
+    let allMatched = true;
+    const itemResults: unknown[] = [];
+
+    for (const expected of expectedItems) {
+      let bestIdx = -1;
+      for (let i = 0; i < enrichedItems.length; i++) {
+        if (usedIndices.has(i)) continue;
+        const item = enrichedItems[i]!;
+        const acceptedTypes = Array.isArray(expected.type) ? expected.type : [expected.type];
+        const cat0 = String(item.categories[0]);
+        const typeMatch = acceptedTypes.some((t) => t === cat0);
+        const keywordMatch = expected.summaryContains.every((kw) =>
+          item.summary.toLowerCase().includes(kw.toLowerCase()),
+        );
+        if (typeMatch && keywordMatch) { bestIdx = i; break; }
+      }
+      if (bestIdx === -1) {
+        allMatched = false;
+        itemResults.push({ expected: { type: expected.type, summaryContains: expected.summaryContains }, matched: false });
+      } else {
+        usedIndices.add(bestIdx);
+        itemResults.push({
+          expected: { type: expected.type, summaryContains: expected.summaryContains },
+          matched: true,
+          got: { type: enrichedItems[bestIdx]!.categories[0], summary: enrichedItems[bestIdx]!.summary.slice(0, 120) },
+        });
+      }
+    }
+
+    const allItems = enrichedItems.map((i) => ({ type: i.categories[0], summary: i.summary.slice(0, 200) }));
+    if (allMatched) {
+      pass++;
+      results.push({ file, expectedSkip: false, gateCaptures, pass: true, itemResults });
+      console.log(`  [PASS] ${file}`);
+    } else {
+      results.push({ file, expectedSkip: false, gateCaptures, pass: false, reason: "One or more expected items not matched", itemResults, allItems });
+      console.log(`  [FAIL] ${file}: some expected items not matched`);
+      for (const r of itemResults as Array<{ matched: boolean; expected: { type: string; summaryContains: string[] } }>) {
+        if (!r.matched) console.log(`    missing: ${r.expected.type} — keywords [${r.expected.summaryContains.join(", ")}]`);
+      }
+      console.log(`  Actual items produced:`);
+      for (const item of allItems) console.log(`    [${item.type}] ${item.summary}`);
+    }
+  }
+
+  const total = exampleFiles.length;
+  const accuracy = pass / total;
+  console.log(`\nOverall: ${(accuracy * 100).toFixed(1)}% (${pass}/${total}) — threshold >=80.0%`);
+
+  const summary = { promptVersion, pass, total, accuracy };
+  return { summary, rows: results };
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -514,8 +662,8 @@ async function main() {
     return process.argv[idx + 1] ?? "single";
   })();
 
-  if (!["single", "batch", "thread", "granolaGate"].includes(mode)) {
-    console.error(`Unknown --mode: ${mode}. Valid: single, batch, thread, granolaGate`);
+  if (!["single", "batch", "thread", "granolaGate", "granolaEnricher"].includes(mode)) {
+    console.error(`Unknown --mode: ${mode}. Valid: single, batch, thread, granolaGate, granolaEnricher`);
     process.exit(1);
   }
 
@@ -538,6 +686,17 @@ async function main() {
     const outPath = `./data/eval-results/${ts}-granolaGate-${(result.summary as any).promptVersion}.json`;
     writeFileSync(outPath, JSON.stringify(result, null, 2));
     console.log(`\nResults saved to ${outPath}`);
+    return;
+  }
+
+  if (mode === "granolaEnricher") {
+    const result = await evalGranolaEnricher(config);
+    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
+    mkdirSync("./data/eval-results", { recursive: true });
+    const outPath = `./data/eval-results/${ts}-granolaEnricher-${(result.summary as any).promptVersion}.json`;
+    writeFileSync(outPath, JSON.stringify(result, null, 2));
+    console.log(`\nResults saved to ${outPath}`);
+    if ((result.summary as any).accuracy < 0.8) process.exit(1);
     return;
   }
 

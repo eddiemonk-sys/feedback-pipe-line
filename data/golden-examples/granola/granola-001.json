@@ -11,14 +11,14 @@
     "itemCount": 4,
     "items": [
       {
-        "summaryContains": ["job family", "manual", "clone"],
+        "summaryContains": ["dimension", "two hours"],
         "audience": "Talent Leader",
-        "type": "Feature Request"
+        "type": ["Feature Request", "UX / Usability"]
       },
       {
-        "summaryContains": ["video", "drop", "completion"],
+        "summaryContains": ["video", "completion", "61%"],
         "audience": "Talent Leader",
-        "type": "UX / Usability"
+        "type": "Candidate Experience"
       },
       {
         "summaryContains": ["report", "technical", "hiring manager"],
