@@ -18,6 +18,7 @@ export interface BoardRow {
   title: string;
   categories: string[];
   summary: string[];
+  meetingTitle?: string;
   messageUrl?: string;
   original: string;
   judge?: string;
@@ -149,6 +150,7 @@ function mapPage(page: Record<string, any>): BoardRow | null {
     title,
     categories: (props["Categories"]?.multi_select ?? []).map((o: any) => o.name as string),
     summary: summarySplit,
+    meetingTitle: source !== "Slack" ? (props["Channel"]?.rich_text?.[0]?.plain_text || undefined) : undefined,
     messageUrl: props["Message URL"]?.url ?? undefined,
     original: messageText,
     judge: props["Judge Rationale"]?.rich_text?.[0]?.plain_text || undefined,

@@ -151,7 +151,7 @@ async function processNote(
     try {
       const pageId = await deps.notion.createFeedback({
         message: content.slice(0, 2000),
-        channelName: "Granola",
+        channelName: title,
         authorName,
         dateIso,
         flaggedByName: "Granola (auto)",

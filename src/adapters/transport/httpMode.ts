@@ -68,17 +68,29 @@ export async function startHttpMode(
   const webDir = join(process.cwd(), "web");
   if (options.notionApiKey && options.notionDatabaseId) {
     const boardReader = new FeedbackBoardReader(options.notionApiKey, options.notionDatabaseId);
+    let cache: { js: string; expiresAt: number } | null = null;
+    const CACHE_TTL_MS = 60_000;
     receiver.router.get("/feedback-data.js", async (_req: any, res: any) => {
       try {
-        const rows = await boardReader.readAllRows();
+        const now = Date.now();
+        if (!cache || now > cache.expiresAt) {
+          const rows = await boardReader.readAllRows();
+          cache = { js: generateFeedbackDataJs(rows), expiresAt: now + CACHE_TTL_MS };
+          logger.info("Web board: refreshed Notion data cache");
+        }
         res.setHeader("Content-Type", "application/javascript; charset=utf-8");
-        res.send(generateFeedbackDataJs(rows));
+        res.send(cache.js);
       } catch (err) {
-        logger.error("Board reader failed — falling back to static feedback-data.js", { err: String(err) });
-        res.status(500).send("/* Error loading live data — reload to retry */");
+        logger.error("Board reader failed", { err: String(err) });
+        if (cache) {
+          res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+          res.send(cache.js); // serve stale on error rather than blank board
+        } else {
+          res.status(500).send("/* Error loading live data — reload to retry */");
+        }
       }
     });
-    logger.info("Web board: live /feedback-data.js enabled (reads Notion)");
+    logger.info("Web board: live /feedback-data.js enabled (reads Notion, 60s cache)");
   }
 
   if (existsSync(webDir)) {
